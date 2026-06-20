@@ -9,6 +9,7 @@ class RegistrationData {
     required this.password,
     required this.governorate,
     required this.area,
+    required this.areaId,
     required this.address,
     this.profession,
     this.yearsExperience,
@@ -22,6 +23,7 @@ class RegistrationData {
   final String password;
   final String governorate;
   final String area;
+  final int areaId;
   final String address;
   final String? profession;
   final int? yearsExperience;
@@ -34,6 +36,7 @@ class RegistrationData {
       'phone': phone.trim(),
       'governorate': governorate.trim(),
       'area': area.trim(),
+      'area_id': areaId,
       'address': address.trim(),
       if (profession != null) 'profession': profession,
       if (yearsExperience != null) 'years_experience': yearsExperience,

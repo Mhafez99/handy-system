@@ -5,6 +5,7 @@ class CreateServiceRequestData {
     required this.description,
     required this.governorate,
     required this.area,
+    required this.areaId,
     required this.address,
     required this.preferredTime,
   });
@@ -14,6 +15,7 @@ class CreateServiceRequestData {
   final String description;
   final String governorate;
   final String area;
+  final int areaId;
   final String address;
   final String preferredTime;
 }

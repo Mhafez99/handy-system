@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:handy_app/features/areas/domain/area.dart';
+import 'package:handy_app/features/areas/presentation/area_picker_fields.dart';
 import 'package:handy_app/features/auth/data/auth_repository.dart';
 import 'package:handy_app/features/auth/domain/account_role.dart';
 import 'package:handy_app/features/auth/domain/registration_data.dart';
@@ -24,14 +26,13 @@ class _RegistrationPageState extends State<RegistrationPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
-  final governorateController = TextEditingController(text: 'القاهرة');
-  final areaController = TextEditingController();
   final addressController = TextEditingController();
   final experienceController = TextEditingController();
   final bioController = TextEditingController();
   final repository = AuthRepository();
 
   String? selectedProfession;
+  Area? selectedArea;
   bool acceptedTerms = false;
   bool isSubmitting = false;
   bool obscurePassword = true;
@@ -45,8 +46,6 @@ class _RegistrationPageState extends State<RegistrationPage> {
     emailController.dispose();
     passwordController.dispose();
     confirmPasswordController.dispose();
-    governorateController.dispose();
-    areaController.dispose();
     addressController.dispose();
     experienceController.dispose();
     bioController.dispose();
@@ -62,6 +61,12 @@ class _RegistrationPageState extends State<RegistrationPage> {
       return;
     }
 
+    final area = selectedArea;
+    if (area == null) {
+      showError('اختر المحافظة والمنطقة.');
+      return;
+    }
+
     setState(() => isSubmitting = true);
     try {
       final requiresEmailConfirmation = await repository.signUp(
@@ -71,8 +76,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
           phone: phoneController.text,
           email: emailController.text,
           password: passwordController.text,
-          governorate: governorateController.text,
-          area: areaController.text,
+          governorate: area.governorate,
+          area: area.name,
+          areaId: area.id,
           address: addressController.text,
           profession: selectedProfession,
           yearsExperience: isWorker
@@ -194,20 +200,12 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 16),
-                buildTextField(
-                  controller: governorateController,
-                  label: 'المحافظة',
-                  icon: Icons.location_city_outlined,
-                  validator: requiredValidator('اكتب المحافظة'),
-                  textInputAction: TextInputAction.next,
-                ),
-                const SizedBox(height: 16),
-                buildTextField(
-                  controller: areaController,
-                  label: 'المنطقة',
-                  icon: Icons.place_outlined,
-                  validator: requiredValidator('اكتب المنطقة'),
-                  textInputAction: TextInputAction.next,
+                AreaPickerFields(
+                  selectedArea: selectedArea,
+                  onAreaChanged: (area) {
+                    setState(() => selectedArea = area);
+                  },
+                  enabled: !isSubmitting,
                 ),
                 const SizedBox(height: 16),
                 buildTextField(

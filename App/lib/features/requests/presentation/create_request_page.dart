@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:handy_app/features/areas/domain/area.dart';
+import 'package:handy_app/features/areas/presentation/area_picker_fields.dart';
 import 'package:handy_app/features/requests/data/service_requests_repository.dart';
 import 'package:handy_app/features/requests/domain/create_service_request_data.dart';
 import 'package:handy_app/features/requests/domain/service_category.dart';
@@ -18,8 +20,6 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
   final formKey = GlobalKey<FormState>();
   final repository = ServiceRequestsRepository();
   final descriptionController = TextEditingController();
-  final governorateController = TextEditingController();
-  final areaController = TextEditingController();
   final addressController = TextEditingController();
   final preferredTimeController = TextEditingController(text: 'في أقرب وقت');
 
@@ -27,6 +27,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
   List<ServiceItem> services = [];
   ServiceCategory? selectedCategory;
   ServiceItem? selectedService;
+  Area? selectedArea;
   bool isLoadingServices = false;
   bool isSubmitting = false;
 
@@ -34,16 +35,12 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
   void initState() {
     super.initState();
     categoriesFuture = repository.loadCategories();
-    governorateController.text = widget.profile['governorate'] as String? ?? '';
-    areaController.text = widget.profile['area'] as String? ?? '';
     addressController.text = widget.profile['address'] as String? ?? '';
   }
 
   @override
   void dispose() {
     descriptionController.dispose();
-    governorateController.dispose();
-    areaController.dispose();
     addressController.dispose();
     preferredTimeController.dispose();
     super.dispose();
@@ -86,8 +83,13 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
     }
     final category = selectedCategory;
     final service = selectedService;
+    final area = selectedArea;
     if (category == null || service == null) {
       showError('اختر التخصص والخدمة.');
+      return;
+    }
+    if (area == null) {
+      showError('اختر المحافظة والمنطقة.');
       return;
     }
 
@@ -98,8 +100,9 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
           categoryId: category.id,
           serviceId: service.id,
           description: descriptionController.text,
-          governorate: governorateController.text,
-          area: areaController.text,
+          governorate: area.governorate,
+          area: area.name,
+          areaId: area.id,
           address: addressController.text,
           preferredTime: preferredTimeController.text,
         ),
@@ -247,22 +250,16 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
                       },
                     ),
                     const SizedBox(height: 16),
-                    TextFormField(
-                      controller: governorateController,
-                      decoration: const InputDecoration(
-                        labelText: 'المحافظة',
-                        prefixIcon: Icon(Icons.location_city_outlined),
-                      ),
-                      validator: requiredValidator('اكتب المحافظة'),
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: areaController,
-                      decoration: const InputDecoration(
-                        labelText: 'المنطقة',
-                        prefixIcon: Icon(Icons.place_outlined),
-                      ),
-                      validator: requiredValidator('اكتب المنطقة'),
+                    AreaPickerFields(
+                      selectedArea: selectedArea,
+                      initialAreaId: parseAreaId(widget.profile['area_id']),
+                      initialGovernorate:
+                          widget.profile['governorate'] as String?,
+                      initialAreaName: widget.profile['area'] as String?,
+                      onAreaChanged: (area) {
+                        setState(() => selectedArea = area);
+                      },
+                      enabled: !isSubmitting,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -317,4 +314,14 @@ String? Function(String?) requiredValidator(String message) {
     }
     return null;
   };
+}
+
+int? parseAreaId(dynamic value) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  return null;
 }

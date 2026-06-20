@@ -25,6 +25,7 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
   late Future<ServiceRequestDetails> detailsFuture;
   String? acceptingOfferId;
   bool isCompleting = false;
+  bool isCancelling = false;
   bool isSubmittingReview = false;
   int selectedRating = 5;
 
@@ -68,6 +69,56 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
     } finally {
       if (mounted) {
         setState(() => acceptingOfferId = null);
+      }
+    }
+  }
+
+  Future<void> confirmAndCancelRequest() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('إلغاء الطلب'),
+        content: const Text(
+          'هل أنت متأكد من إلغاء هذا الطلب؟ لن تستطيع استقبال عروض جديدة بعد الإلغاء.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('تراجع'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('إلغاء الطلب'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    setState(() => isCancelling = true);
+
+    try {
+      await repository.cancelRequest(widget.requestId);
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('تم إلغاء الطلب بنجاح.')));
+      reloadDetails();
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر إلغاء الطلب. حاول مرة أخرى.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => isCancelling = false);
       }
     }
   }
@@ -191,6 +242,12 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
                   const SizedBox(height: 16),
                   DetailCard(details: details),
                   const SizedBox(height: 12),
+                  CancelActionCard(
+                    status: details.status,
+                    isCancelling: isCancelling,
+                    onCancel: confirmAndCancelRequest,
+                  ),
+                  const SizedBox(height: 12),
                   CompletionActionCard(
                     status: details.status,
                     isCompleting: isCompleting,
@@ -272,6 +329,71 @@ class DetailCard extends StatelessWidget {
             Text('الوقت المناسب: ${details.preferredTime}'),
             const SizedBox(height: 10),
             Text('نطاق السعر الاسترشادي: ${details.priceRange}'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class CancelActionCard extends StatelessWidget {
+  const CancelActionCard({
+    required this.status,
+    required this.isCancelling,
+    required this.onCancel,
+    super.key,
+  });
+
+  final String status;
+  final bool isCancelling;
+  final VoidCallback onCancel;
+
+  bool get canCancel => status == 'new' || status == 'offered';
+
+  @override
+  Widget build(BuildContext context) {
+    if (status == 'cancelled') {
+      return Card(
+        color: Theme.of(context).colorScheme.errorContainer,
+        child: const Padding(
+          padding: EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Icon(Icons.cancel_outlined),
+              SizedBox(width: 10),
+              Expanded(child: Text('تم إلغاء هذا الطلب.')),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (!canCancel) {
+      return const SizedBox.shrink();
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('لو مش محتاج الخدمة دلوقتي، تقدر تلغي الطلب من هنا.'),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: isCancelling ? null : onCancel,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.error,
+                side: BorderSide(color: Theme.of(context).colorScheme.error),
+              ),
+              icon: isCancelling
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.cancel_outlined),
+              label: const Text('إلغاء الطلب'),
+            ),
           ],
         ),
       ),

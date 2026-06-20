@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:handy_app/features/areas/domain/area.dart';
 import 'package:handy_app/features/auth/domain/account_role.dart';
+import 'package:handy_app/features/auth/presentation/profile_page.dart';
 import 'package:handy_app/features/auth/presentation/registration_page.dart';
 import 'package:handy_app/features/offers/domain/service_offer.dart';
 import 'package:handy_app/features/offers/presentation/send_offer_page.dart';
@@ -15,6 +17,25 @@ import 'package:handy_app/features/worker/presentation/worker_details_page.dart'
 import 'package:handy_app/features/worker/presentation/worker_home_page.dart';
 
 void main() {
+  testWidgets('area model parses json', (tester) async {
+    final area = Area.fromJson({
+      'id': 1,
+      'governorate': 'القاهرة',
+      'name': 'مدينة نصر',
+    });
+
+    expect(area.id, 1);
+    expect(area.governorate, 'القاهرة');
+    expect(area.name, 'مدينة نصر');
+  });
+
+  testWidgets('profile page shows loading state', (tester) async {
+    await tester.pumpWidget(const TestApp(child: ProfilePage()));
+
+    expect(find.text('الملف الشخصي'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+  });
+
   testWidgets('account role choices are visible', (tester) async {
     await tester.pumpWidget(const TestApp());
 
@@ -74,6 +95,7 @@ void main() {
             'area': 'مدينة نصر',
           },
           onSignOut: () async {},
+          onProfileChanged: () {},
         ),
       ),
     );
@@ -175,6 +197,76 @@ void main() {
 
     expect(find.text('أحمد الفني'), findsOneWidget);
     expect(find.text('4.8 من 5 (20 تقييم)'), findsOneWidget);
+  });
+
+  testWidgets('new request shows cancel action', (tester) async {
+    await tester.pumpWidget(
+      TestApp(
+        child: Scaffold(
+          body: CancelActionCard(
+            status: 'new',
+            isCancelling: false,
+            onCancel: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('إلغاء الطلب'), findsOneWidget);
+    expect(
+      find.text('لو مش محتاج الخدمة دلوقتي، تقدر تلغي الطلب من هنا.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('offered request shows cancel action', (tester) async {
+    await tester.pumpWidget(
+      TestApp(
+        child: Scaffold(
+          body: CancelActionCard(
+            status: 'offered',
+            isCancelling: false,
+            onCancel: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('إلغاء الطلب'), findsOneWidget);
+  });
+
+  testWidgets('cancelled request shows cancelled message', (tester) async {
+    await tester.pumpWidget(
+      TestApp(
+        child: Scaffold(
+          body: CancelActionCard(
+            status: 'cancelled',
+            isCancelling: false,
+            onCancel: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('تم إلغاء هذا الطلب.'), findsOneWidget);
+    expect(find.text('إلغاء الطلب'), findsNothing);
+  });
+
+  testWidgets('accepted request hides cancel action', (tester) async {
+    await tester.pumpWidget(
+      TestApp(
+        child: Scaffold(
+          body: CancelActionCard(
+            status: 'accepted',
+            isCancelling: false,
+            onCancel: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('إلغاء الطلب'), findsNothing);
+    expect(find.text('تم إلغاء هذا الطلب.'), findsNothing);
   });
 
   testWidgets('in progress request shows completion action', (tester) async {

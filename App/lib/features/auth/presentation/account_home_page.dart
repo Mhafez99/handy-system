@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:handy_app/features/auth/data/auth_repository.dart';
+import 'package:handy_app/features/auth/presentation/profile_page.dart';
 import 'package:handy_app/features/customer/presentation/customer_home_page.dart';
 import 'package:handy_app/features/worker/presentation/worker_home_page.dart';
 
@@ -64,6 +65,7 @@ class _AccountHomePageState extends State<AccountHomePage> {
           return CustomerHomePage(
             profile: profile,
             onSignOut: repository.signOut,
+            onProfileChanged: reloadProfile,
           );
         }
 
@@ -71,12 +73,14 @@ class _AccountHomePageState extends State<AccountHomePage> {
           return WorkerHomePage(
             profile: profile,
             onSignOut: repository.signOut,
+            onProfileChanged: reloadProfile,
           );
         }
 
         return WorkerWaitingPage(
           profile: profile,
           onSignOut: repository.signOut,
+          onProfileChanged: reloadProfile,
         );
       },
     );
@@ -87,11 +91,23 @@ class WorkerWaitingPage extends StatelessWidget {
   const WorkerWaitingPage({
     required this.profile,
     required this.onSignOut,
+    required this.onProfileChanged,
     super.key,
   });
 
   final Map<String, dynamic> profile;
   final Future<void> Function() onSignOut;
+  final VoidCallback onProfileChanged;
+
+  Future<void> openProfile(BuildContext context) async {
+    final updated = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (context) => const ProfilePage()),
+    );
+
+    if (updated == true) {
+      onProfileChanged();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -99,6 +115,11 @@ class WorkerWaitingPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('حسابي'),
         actions: [
+          IconButton(
+            tooltip: 'الملف الشخصي',
+            onPressed: () => openProfile(context),
+            icon: const Icon(Icons.person_outline_rounded),
+          ),
           IconButton(
             tooltip: 'تسجيل الخروج',
             onPressed: onSignOut,

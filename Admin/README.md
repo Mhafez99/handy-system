@@ -32,6 +32,8 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 
 ```text
 C:\handy-app\supabase\migrations\202606200008_admin_worker_approval.sql
+C:\handy-app\supabase\migrations\202606200011_create_areas.sql
+C:\handy-app\supabase\migrations\202606200012_admin_manage_areas.sql
 ```
 
 ## إنشاء أول مدير
@@ -54,3 +56,4 @@ on conflict (user_id) do nothing;
 - عرض الصنايعية المعلّقين.
 - اعتماد الصنايعي وتحويل حسابه إلى `active`.
 - رفض الصنايعي وتحويل حسابه إلى `suspended`.
+- إدارة المناطق: عرض، إضافة، تعديل، تفعيل، وإخفاء.

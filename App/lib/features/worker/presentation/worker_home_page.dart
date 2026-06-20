@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:handy_app/features/auth/presentation/profile_page.dart';
 import 'package:handy_app/features/offers/presentation/send_offer_page.dart';
 import 'package:handy_app/features/requests/data/service_requests_repository.dart';
 import 'package:handy_app/features/requests/domain/accepted_worker_request.dart';
@@ -9,11 +10,13 @@ class WorkerHomePage extends StatefulWidget {
   const WorkerHomePage({
     required this.profile,
     required this.onSignOut,
+    required this.onProfileChanged,
     super.key,
   });
 
   final Map<String, dynamic> profile;
   final Future<void> Function() onSignOut;
+  final VoidCallback onProfileChanged;
 
   @override
   State<WorkerHomePage> createState() => _WorkerHomePageState();
@@ -37,6 +40,16 @@ class _WorkerHomePageState extends State<WorkerHomePage> {
       requestsFuture = repository.loadAvailableWorkerRequests();
       acceptedRequestsFuture = repository.loadAcceptedWorkerRequests();
     });
+  }
+
+  Future<void> openProfile() async {
+    final updated = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (context) => const ProfilePage()),
+    );
+
+    if (updated == true) {
+      widget.onProfileChanged();
+    }
   }
 
   Future<void> openSendOffer(AvailableWorkerRequest request) async {
@@ -81,6 +94,11 @@ class _WorkerHomePageState extends State<WorkerHomePage> {
       appBar: AppBar(
         title: const Text('طلبات متاحة'),
         actions: [
+          IconButton(
+            tooltip: 'الملف الشخصي',
+            onPressed: openProfile,
+            icon: const Icon(Icons.person_outline_rounded),
+          ),
           IconButton(
             tooltip: 'تسجيل الخروج',
             onPressed: widget.onSignOut,

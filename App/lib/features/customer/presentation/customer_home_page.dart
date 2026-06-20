@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:handy_app/features/auth/presentation/profile_page.dart';
 import 'package:handy_app/features/requests/data/service_requests_repository.dart';
 import 'package:handy_app/features/requests/domain/customer_request.dart';
 import 'package:handy_app/features/requests/presentation/create_request_page.dart';
@@ -8,11 +9,13 @@ class CustomerHomePage extends StatefulWidget {
   const CustomerHomePage({
     required this.profile,
     required this.onSignOut,
+    required this.onProfileChanged,
     super.key,
   });
 
   final Map<String, dynamic> profile;
   final Future<void> Function() onSignOut;
+  final VoidCallback onProfileChanged;
 
   @override
   State<CustomerHomePage> createState() => _CustomerHomePageState();
@@ -32,6 +35,16 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     setState(() {
       requestsFuture = repository.loadCustomerRequests();
     });
+  }
+
+  Future<void> openProfile() async {
+    final updated = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (context) => const ProfilePage()),
+    );
+
+    if (updated == true) {
+      onProfileChanged();
+    }
   }
 
   Future<void> openCreateRequest() async {
@@ -62,6 +75,11 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       appBar: AppBar(
         title: const Text('الرئيسية'),
         actions: [
+          IconButton(
+            tooltip: 'الملف الشخصي',
+            onPressed: openProfile,
+            icon: const Icon(Icons.person_outline_rounded),
+          ),
           IconButton(
             tooltip: 'تسجيل الخروج',
             onPressed: widget.onSignOut,

@@ -1,4 +1,5 @@
 import 'package:handy_app/features/auth/domain/registration_data.dart';
+import 'package:handy_app/features/auth/domain/update_profile_data.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthRepository {
@@ -34,6 +35,54 @@ class AuthRepository {
     }
 
     return _client.from('profiles').select().eq('id', user.id).single();
+  }
+
+  Future<Map<String, dynamic>?> loadWorkerProfile() async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw const AuthException('لا توجد جلسة مستخدم نشطة.');
+    }
+
+    final row = await _client
+        .from('worker_profiles')
+        .select('profession, years_experience, bio, approval_status')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+    return row;
+  }
+
+  String? get currentUserEmail => _client.auth.currentUser?.email;
+
+  Future<void> updateProfile(UpdateProfileData data) async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw const AuthException('لا توجد جلسة مستخدم نشطة.');
+    }
+
+    await _client
+        .from('profiles')
+        .update({
+          'full_name': data.fullName.trim(),
+          'phone': data.phone.trim(),
+          'governorate': data.governorate.trim(),
+          'area': data.area.trim(),
+          'area_id': data.areaId,
+          'address': data.address.trim(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('id', user.id);
+
+    if (data.includesWorkerFields) {
+      await _client
+          .from('worker_profiles')
+          .update({
+            'profession': data.profession!.trim(),
+            'years_experience': data.yearsExperience,
+            'bio': data.bio!.trim(),
+          })
+          .eq('user_id', user.id);
+    }
   }
 
   Future<void> signOut() {

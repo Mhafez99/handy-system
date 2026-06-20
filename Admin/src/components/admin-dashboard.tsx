@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
+import { AreasPanel } from "@/components/areas-panel";
 import {
   approveWorker,
   loadPendingWorkers,
@@ -15,8 +16,11 @@ type ActionState = {
   type: "approve" | "reject";
 } | null;
 
+type AdminTab = "workers" | "areas";
+
 export function AdminDashboard() {
   const [session, setSession] = useState<Session | null>(null);
+  const [activeTab, setActiveTab] = useState<AdminTab>("workers");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [workers, setWorkers] = useState<PendingWorker[]>([]);
@@ -26,6 +30,7 @@ export function AdminDashboard() {
   const [actionState, setActionState] = useState<ActionState>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [areasRefreshToken, setAreasRefreshToken] = useState(0);
 
   const adminEmail = useMemo(() => session?.user.email ?? "", [session]);
 
@@ -196,54 +201,96 @@ export function AdminDashboard() {
       <header className="topbar">
         <div>
           <p className="eyebrow">Handy Admin</p>
-          <h1>اعتماد الصنايعية</h1>
+          <h1>{activeTab === "workers" ? "اعتماد الصنايعية" : "إدارة المناطق"}</h1>
           <p className="muted">مسجل كـ {adminEmail}</p>
         </div>
         <div className="topbar-actions">
-          <button className="secondary-button" onClick={refreshWorkers}>
-            تحديث
-          </button>
+          {activeTab === "workers" ? (
+            <button className="secondary-button" onClick={refreshWorkers}>
+              تحديث
+            </button>
+          ) : (
+            <button
+              className="secondary-button"
+              onClick={() => setAreasRefreshToken((current) => current + 1)}
+            >
+              تحديث
+            </button>
+          )}
           <button className="ghost-button" onClick={signOut}>
             خروج
           </button>
         </div>
       </header>
 
-      <section className="stats-grid">
-        <article className="stat-card">
-          <span>بانتظار المراجعة</span>
-          <strong>{workers.length}</strong>
-        </article>
-        <article className="stat-card">
-          <span>الحالة</span>
-          <strong>{isLoadingWorkers ? "تحميل" : "جاهز"}</strong>
-        </article>
-      </section>
+      <nav className="admin-tabs" aria-label="أقسام لوحة الإدارة">
+        <button
+          className={activeTab === "workers" ? "tab-button active" : "tab-button"}
+          onClick={() => {
+            setActiveTab("workers");
+            setMessage("");
+            setError("");
+          }}
+        >
+          الصنايعية
+        </button>
+        <button
+          className={activeTab === "areas" ? "tab-button active" : "tab-button"}
+          onClick={() => {
+            setActiveTab("areas");
+            setMessage("");
+            setError("");
+          }}
+        >
+          المناطق
+        </button>
+      </nav>
 
       <Feedback message={message} error={error} />
 
-      <section className="workers-list">
-        {isLoadingWorkers ? (
-          <div className="panel">
-            <p className="muted">جاري تحميل الصنايعية...</p>
-          </div>
-        ) : workers.length === 0 ? (
-          <div className="panel empty">
-            <h2>لا توجد حسابات معلّقة</h2>
-            <p className="muted">أي صنايعي جديد سيظهر هنا للمراجعة.</p>
-          </div>
-        ) : (
-          workers.map((worker) => (
-            <WorkerCard
-              key={worker.user_id}
-              worker={worker}
-              actionState={actionState}
-              onApprove={() => handleWorkerAction(worker.user_id, "approve")}
-              onReject={() => handleWorkerAction(worker.user_id, "reject")}
-            />
-          ))
-        )}
-      </section>
+      {activeTab === "workers" ? (
+        <>
+          <section className="stats-grid">
+            <article className="stat-card">
+              <span>بانتظار المراجعة</span>
+              <strong>{workers.length}</strong>
+            </article>
+            <article className="stat-card">
+              <span>الحالة</span>
+              <strong>{isLoadingWorkers ? "تحميل" : "جاهز"}</strong>
+            </article>
+          </section>
+
+          <section className="workers-list">
+            {isLoadingWorkers ? (
+              <div className="panel">
+                <p className="muted">جاري تحميل الصنايعية...</p>
+              </div>
+            ) : workers.length === 0 ? (
+              <div className="panel empty">
+                <h2>لا توجد حسابات معلّقة</h2>
+                <p className="muted">أي صنايعي جديد سيظهر هنا للمراجعة.</p>
+              </div>
+            ) : (
+              workers.map((worker) => (
+                <WorkerCard
+                  key={worker.user_id}
+                  worker={worker}
+                  actionState={actionState}
+                  onApprove={() => handleWorkerAction(worker.user_id, "approve")}
+                  onReject={() => handleWorkerAction(worker.user_id, "reject")}
+                />
+              ))
+            )}
+          </section>
+        </>
+      ) : (
+        <AreasPanel
+          key={areasRefreshToken}
+          onMessage={setMessage}
+          onError={setError}
+        />
+      )}
     </main>
   );
 }
@@ -323,6 +370,10 @@ function Feedback({ message, error }: { message: string; error: string }) {
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) {
+    if (error.message === "Admin access required") {
+      return "ليس لديك صلاحية إدارية.";
+    }
+
     return error.message;
   }
 

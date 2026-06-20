@@ -28,7 +28,13 @@
    `supabase/migrations/202606200009_worker_rating_summary.sql`
 13. نفذ محتوى ملف تفاصيل الصنايعي العامة:
    `supabase/migrations/202606200010_worker_public_details.sql`
-14. من `Project Settings > API` انسخ:
+14. نفذ محتوى ملف المناطق المنظمة:
+   `supabase/migrations/202606200011_create_areas.sql`
+15. نفذ محتوى ملف إدارة المناطق من لوحة الإدارة:
+   `supabase/migrations/202606200012_admin_manage_areas.sql`
+16. نفذ محتوى ملف صلاحية تعديل المنطقة في الملف الشخصي:
+   `supabase/migrations/202606200013_profile_area_id_update.sql`
+17. من `Project Settings > API` انسخ:
    - Project URL
    - Publishable key
 
@@ -62,6 +68,7 @@ flutter run --dart-define-from-file=config/backend.json
 - ملخص تقييم الصنايعي يظهر للعميل داخل كارت العرض بدالة `worker_rating_summary`.
 - صفحة تفاصيل الصنايعي تستخدم دالة `worker_public_details` لعرض النبذة وآخر التقييمات.
 - لوحة الإدارة تستخدم دوال `admin_list_pending_workers` و`admin_approve_worker` و`admin_reject_worker`.
+- إدارة المناطق من لوحة الإدارة تستخدم دوال `admin_list_areas` و`admin_create_area` و`admin_update_area`.
 
 ## إنشاء أول حساب إدارة
 
@@ -89,4 +96,23 @@ where id = 'WORKER_USER_ID';
 update public.worker_profiles
 set approval_status = 'approved', reviewed_at = now()
 where user_id = 'WORKER_USER_ID';
+```
+
+## إدارة المناطق
+
+المناطق تُدار من جدول `areas` أو من لوحة الإدارة في تبويب **المناطق**.
+
+لإضافة منطقة جديدة يدويًا:
+
+```sql
+insert into public.areas (governorate, name, sort_order)
+values ('القاهرة', 'الزمالك', 5);
+```
+
+لإخفاء منطقة دون حذفها:
+
+```sql
+update public.areas
+set is_active = false
+where governorate = 'القاهرة' and name = 'الزمالك';
 ```

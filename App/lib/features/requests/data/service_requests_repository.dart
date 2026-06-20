@@ -181,6 +181,19 @@ class ServiceRequestsRepository {
     );
   }
 
+  Future<void> cancelRequest(String requestId) async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw const AuthException('لا توجد جلسة مستخدم نشطة.');
+    }
+
+    await _client
+        .from('service_requests')
+        .update({'status': 'cancelled'})
+        .eq('id', requestId)
+        .eq('customer_id', user.id);
+  }
+
   Future<void> createRequest(CreateServiceRequestData data) async {
     final user = _client.auth.currentUser;
     if (user == null) {
@@ -194,6 +207,7 @@ class ServiceRequestsRepository {
       'description': data.description.trim(),
       'governorate': data.governorate.trim(),
       'area': data.area.trim(),
+      'area_id': data.areaId,
       'address': data.address.trim(),
       'preferred_time': data.preferredTime.trim(),
     });
