@@ -70,6 +70,14 @@ flutter run --dart-define-from-file=config/backend.json
 - لوحة الإدارة تستخدم دوال `admin_list_pending_workers` و`admin_approve_worker` و`admin_reject_worker`.
 - إدارة المناطق من لوحة الإدارة تستخدم دوال `admin_list_areas` و`admin_create_area` و`admin_update_area`.
 
+## استعادة كلمة المرور
+
+- من شاشة تسجيل الدخول اضغط `نسيت كلمة المرور؟` ثم أدخل البريد الإلكتروني.
+- Supabase يرسل رابط إعادة التعيين إلى البريد.
+- بعد فتح الرابط، يظهر للمستخدم شاشة `كلمة مرور جديدة` داخل التطبيق إذا كان الرابط يعيد التوجيه للتطبيق.
+- تأكد من تفعيل البريد في `Authentication > Providers > Email` داخل Supabase.
+- أضف رابط إعادة التوجيه المناسب في `Authentication > URL Configuration` إذا كنت تستخدم deep link للتطبيق.
+
 ## إنشاء أول حساب إدارة
 
 1. أنشئ حسابًا عاديًا من التطبيق أو Supabase Auth.

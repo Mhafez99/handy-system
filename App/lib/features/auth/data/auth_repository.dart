@@ -28,6 +28,14 @@ class AuthRepository {
     );
   }
 
+  Future<void> requestPasswordReset(String email) async {
+    await _client.auth.resetPasswordForEmail(email.trim());
+  }
+
+  Future<void> updatePassword(String newPassword) async {
+    await _client.auth.updateUser(UserAttributes(password: newPassword));
+  }
+
   Future<Map<String, dynamic>> loadCurrentProfile() async {
     final user = _client.auth.currentUser;
     if (user == null) {

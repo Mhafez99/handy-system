@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:handy_app/features/areas/domain/area.dart';
 import 'package:handy_app/features/auth/domain/account_role.dart';
+import 'package:handy_app/features/auth/presentation/forgot_password_page.dart';
+import 'package:handy_app/features/auth/presentation/login_page.dart';
 import 'package:handy_app/features/auth/presentation/profile_page.dart';
 import 'package:handy_app/features/auth/presentation/registration_page.dart';
 import 'package:handy_app/features/offers/domain/service_offer.dart';
@@ -27,6 +29,19 @@ void main() {
     expect(area.id, 1);
     expect(area.governorate, 'القاهرة');
     expect(area.name, 'مدينة نصر');
+  });
+
+  testWidgets('login page shows forgot password link', (tester) async {
+    await tester.pumpWidget(const TestApp(child: LoginPage()));
+
+    expect(find.text('نسيت كلمة المرور؟'), findsOneWidget);
+  });
+
+  testWidgets('forgot password page shows email form', (tester) async {
+    await tester.pumpWidget(const TestApp(child: ForgotPasswordPage()));
+
+    expect(find.text('استعادة كلمة المرور'), findsOneWidget);
+    expect(find.text('إرسال رابط الاستعادة'), findsOneWidget);
   });
 
   testWidgets('profile page shows loading state', (tester) async {

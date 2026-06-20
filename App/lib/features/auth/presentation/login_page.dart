@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:handy_app/features/auth/data/auth_repository.dart';
+import 'package:handy_app/features/auth/presentation/forgot_password_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginPage extends StatefulWidget {
@@ -114,7 +115,24 @@ class _LoginPageState extends State<LoginPage> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: TextButton(
+                    onPressed: isSubmitting
+                        ? null
+                        : () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (context) =>
+                                    const ForgotPasswordPage(),
+                              ),
+                            );
+                          },
+                    child: const Text('نسيت كلمة المرور؟'),
+                  ),
+                ),
+                const SizedBox(height: 16),
                 FilledButton(
                   onPressed: isSubmitting ? null : submit,
                   child: isSubmitting
