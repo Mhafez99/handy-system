@@ -428,6 +428,17 @@ String? Function(String?) requiredValidator(String message) {
   };
 }
 
+String? validateEmail(String? value) {
+  final email = value?.trim() ?? '';
+  if (email.isEmpty) {
+    return 'اكتب البريد الإلكتروني';
+  }
+  if (!email.contains('@') || !email.contains('.')) {
+    return 'اكتب بريدًا إلكترونيًا صحيحًا';
+  }
+  return null;
+}
+
 String? validatePhone(String? value) {
   final phone = value?.trim() ?? '';
   if (phone.length != 11 || !phone.startsWith('01')) {

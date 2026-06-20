@@ -29,7 +29,7 @@ class BackendSetupPage extends StatelessWidget {
                 const SizedBox(height: 12),
                 const Text(
                   'شغّل التطبيق بقيم SUPABASE_URL وSUPABASE_PUBLISHABLE_KEY '
-                  'بعد تنفيذ ملف قاعدة البيانات الموجود في المشروع.',
+                  'بعد تنفيذ ملفات قاعدة البيانات الموجودة في المشروع.',
                   textAlign: TextAlign.center,
                 ),
               ],
