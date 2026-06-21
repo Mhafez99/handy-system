@@ -5,6 +5,8 @@ import 'package:handy_app/features/requests/data/service_requests_repository.dar
 import 'package:handy_app/features/requests/domain/create_service_request_data.dart';
 import 'package:handy_app/features/requests/domain/service_category.dart';
 import 'package:handy_app/features/requests/domain/service_item.dart';
+import 'package:handy_app/features/requests/presentation/request_image_widgets.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CreateRequestPage extends StatefulWidget {
@@ -28,8 +30,10 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
   ServiceCategory? selectedCategory;
   ServiceItem? selectedService;
   Area? selectedArea;
+  List<XFile> selectedImages = [];
   bool isLoadingServices = false;
   bool isSubmitting = false;
+  static const maxImages = 3;
 
   @override
   void initState() {
@@ -77,6 +81,33 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
     }
   }
 
+  Future<void> pickImages() async {
+    final remainingSlots = maxImages - selectedImages.length;
+    if (remainingSlots <= 0) {
+      return;
+    }
+
+    final pickedImages = await ImagePicker().pickMultiImage(
+      imageQuality: 75,
+      maxWidth: 1600,
+      limit: remainingSlots,
+    );
+
+    if (pickedImages.isEmpty || !mounted) {
+      return;
+    }
+
+    setState(() {
+      selectedImages = [...selectedImages, ...pickedImages].take(maxImages).toList();
+    });
+  }
+
+  void removeImage(int index) {
+    setState(() {
+      selectedImages = [...selectedImages]..removeAt(index);
+    });
+  }
+
   Future<void> submit() async {
     if (!formKey.currentState!.validate()) {
       return;
@@ -95,7 +126,7 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
 
     setState(() => isSubmitting = true);
     try {
-      await repository.createRequest(
+      final requestId = await repository.createRequest(
         CreateServiceRequestData(
           categoryId: category.id,
           serviceId: service.id,
@@ -107,6 +138,10 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
           preferredTime: preferredTimeController.text,
         ),
       );
+
+      if (selectedImages.isNotEmpty) {
+        await repository.uploadRequestImages(requestId, selectedImages);
+      }
 
       if (!mounted) {
         return;
@@ -248,6 +283,14 @@ class _CreateRequestPageState extends State<CreateRequestPage> {
                         }
                         return null;
                       },
+                    ),
+                    const SizedBox(height: 16),
+                    RequestImagePicker(
+                      images: selectedImages,
+                      maxImages: maxImages,
+                      enabled: !isSubmitting,
+                      onPickImages: pickImages,
+                      onRemoveImage: removeImage,
                     ),
                     const SizedBox(height: 16),
                     AreaPickerFields(

@@ -11,11 +11,17 @@ import 'package:handy_app/features/offers/presentation/send_offer_page.dart';
 import 'package:handy_app/features/onboarding/presentation/role_selection_page.dart';
 import 'package:handy_app/features/requests/domain/accepted_worker_request.dart';
 import 'package:handy_app/features/requests/domain/available_worker_request.dart';
+import 'package:handy_app/features/requests/domain/customer_request.dart';
 import 'package:handy_app/features/requests/presentation/create_request_page.dart';
+import 'package:handy_app/features/customer/presentation/customer_requests_page.dart';
+import 'package:handy_app/features/complaints/domain/service_complaint.dart';
+import 'package:handy_app/features/requests/presentation/payment_summary_widgets.dart';
 import 'package:handy_app/features/requests/presentation/request_details_page.dart';
+import 'package:handy_app/features/requests/presentation/request_image_widgets.dart';
 import 'package:handy_app/features/reviews/domain/service_review.dart';
 import 'package:handy_app/features/worker/domain/worker_public_details.dart';
 import 'package:handy_app/features/worker/presentation/worker_details_page.dart';
+import 'package:handy_app/features/worker/presentation/worker_history_page.dart';
 import 'package:handy_app/features/worker/presentation/worker_home_page.dart';
 
 void main() {
@@ -81,6 +87,18 @@ void main() {
     expect(find.text('سنوات الخبرة'), findsOneWidget);
   });
 
+  testWidgets('request image gallery shows empty message', (tester) async {
+    await tester.pumpWidget(
+      TestApp(
+        child: Scaffold(
+          body: RequestImagesGallery(images: const []),
+        ),
+      ),
+    );
+
+    expect(find.text('لا توجد صور مرفقة.'), findsOneWidget);
+  });
+
   testWidgets('create request page shows loading state', (tester) async {
     await tester.pumpWidget(
       const TestApp(
@@ -109,15 +127,15 @@ void main() {
             'governorate': 'القاهرة',
             'area': 'مدينة نصر',
           },
-          onSignOut: () async {},
-          onProfileChanged: () {},
+          availableRequestsFuture: Future.value([]),
+          activeRequestsFuture: Future.value([]),
+          onReload: () {},
         ),
       ),
     );
 
-    expect(find.text('طلبات متاحة'), findsOneWidget);
     expect(find.text('طلباتي المقبولة'), findsOneWidget);
-    expect(find.byType(CircularProgressIndicator), findsAtLeastNWidgets(1));
+    expect(find.text('الطلبات المتاحة'), findsOneWidget);
   });
 
   testWidgets('send offer page shows offer form fields', (tester) async {
@@ -284,22 +302,23 @@ void main() {
     expect(find.text('تم إلغاء هذا الطلب.'), findsNothing);
   });
 
-  testWidgets('in progress request shows completion action', (tester) async {
+  testWidgets('in progress request shows completion code', (tester) async {
     await tester.pumpWidget(
       TestApp(
         child: Scaffold(
-          body: CompletionActionCard(
+          body: CompletionCodeCard(
             status: 'in_progress',
-            isCompleting: false,
-            onComplete: () {},
+            completionCode: '123456',
           ),
         ),
       ),
     );
 
-    expect(find.text('تأكيد إتمام الخدمة'), findsOneWidget);
+    expect(find.text('123456'), findsOneWidget);
     expect(
-      find.text('لو الخدمة خلصت تمام، أكد الإتمام من هنا.'),
+      find.text(
+        'بعد ما الشغل يخلص، ادّي الكود ده للصنايعي عشان يأكد الإتمام.',
+      ),
       findsOneWidget,
     );
   });
@@ -326,6 +345,55 @@ void main() {
 
     expect(find.text('قيّم الخدمة'), findsOneWidget);
     expect(find.text('إرسال التقييم'), findsOneWidget);
+  });
+
+  testWidgets('on the way request shows start work action', (tester) async {
+    await tester.pumpWidget(
+      TestApp(
+        child: Scaffold(
+          body: AcceptedRequestCard(
+            request: AcceptedWorkerRequest(
+              id: 'request-1',
+              serviceName: 'تركيب خلاط',
+              categoryName: 'سباك',
+              description: 'محتاج تركيب خلاط جديد',
+              governorate: 'القاهرة',
+              area: 'مدينة نصر',
+              address: 'شارع رئيسي',
+              preferredTime: 'بكرة صباحًا',
+              status: 'on_the_way',
+              customerName: 'محمد العميل',
+              customerPhone: '01000000000',
+              customerAddress: 'عنوان العميل',
+              acceptedPrice: 300,
+              arrivalTime: 'خلال ساعة',
+              createdAt: DateTime(2026, 6, 20),
+              review: null,
+            ),
+            isMarkingOnTheWay: false,
+            isStarting: false,
+            isCompleting: false,
+            onMarkOnTheWay: () {},
+            onStartWork: () {},
+            onCompleteWork: (code, price) {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.widgetWithText(FilledButton, 'بدأت الشغل'), findsOneWidget);
+  });
+
+  testWidgets('on the way status card is visible for customer', (tester) async {
+    await tester.pumpWidget(
+      TestApp(
+        child: Scaffold(
+          body: OnTheWayStatusCard(status: 'on_the_way'),
+        ),
+      ),
+    );
+
+    expect(find.text('الصنايعي في الطريق إليك.'), findsOneWidget);
   });
 
   testWidgets('accepted worker request card shows customer details', (
@@ -359,7 +427,11 @@ void main() {
               ),
             ),
             isStarting: false,
+            isMarkingOnTheWay: false,
+            isCompleting: false,
+            onMarkOnTheWay: () {},
             onStartWork: () {},
+            onCompleteWork: (code, price) {},
           ),
         ),
       ),
@@ -368,9 +440,266 @@ void main() {
     expect(find.text('بيانات العميل'), findsOneWidget);
     expect(find.text('محمد العميل'), findsOneWidget);
     expect(find.text('01000000000'), findsOneWidget);
-    expect(find.text('بدأت الشغل'), findsOneWidget);
+    expect(find.text('في الطريق'), findsOneWidget);
     expect(find.text('تقييم العميل'), findsOneWidget);
     expect(find.text('شغل ممتاز'), findsOneWidget);
+  });
+
+  testWidgets('completed payment summary shows final price and cash', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      TestApp(
+        child: Scaffold(
+          body: PaymentSummaryCard(
+            status: 'completed',
+            acceptedPrice: 300,
+            finalPrice: 350,
+            paymentMethod: 'cash',
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('ملخص الدفع'), findsOneWidget);
+    expect(find.text('350 جنيه'), findsOneWidget);
+    expect(find.text('تم الدفع كاش'), findsOneWidget);
+    expect(find.text('السعر المتفق عليه'), findsOneWidget);
+  });
+
+  testWidgets('pending payment summary shows agreed price and cash note', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      TestApp(
+        child: Scaffold(
+          body: PaymentSummaryCard(
+            status: 'in_progress',
+            acceptedPrice: 300,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('تفاصيل الدفع'), findsOneWidget);
+    expect(find.text('300 جنيه'), findsOneWidget);
+    expect(find.text('الدفع كاش عند إتمام الشغل'), findsOneWidget);
+  });
+
+  testWidgets('completed request shows complaint form', (tester) async {
+    await tester.pumpWidget(
+      TestApp(
+        child: Scaffold(
+          body: ComplaintActionCard(
+            status: 'completed',
+            complaint: null,
+            isSubmitting: false,
+            onSubmit: (category, description) {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('إرسال الشكوى'), findsOneWidget);
+    expect(find.text('سبب الشكوى'), findsOneWidget);
+  });
+
+  testWidgets('submitted complaint shows complaint details', (tester) async {
+    await tester.pumpWidget(
+      TestApp(
+        child: Scaffold(
+          body: ComplaintActionCard(
+            status: 'complaint',
+            complaint: ServiceComplaint(
+              id: 'complaint-1',
+              category: 'overcharge',
+              description: 'الصنايعي طلب مبلغ أعلى من المتفق عليه.',
+              status: 'open',
+              createdAt: DateTime(2026, 6, 20),
+            ),
+            isSubmitting: false,
+            onSubmit: (category, description) {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('شكواك'), findsOneWidget);
+    expect(find.textContaining('زيادة في السعر'), findsOneWidget);
+    expect(find.textContaining('جديدة'), findsOneWidget);
+  });
+
+  testWidgets('customer requests page shows status tabs', (tester) async {
+    final requests = Future.value([
+      CustomerRequest(
+        id: 'request-1',
+        serviceName: 'تركيب خلاط',
+        categoryName: 'سباك',
+        area: 'مدينة نصر',
+        status: 'completed',
+        offerCount: 2,
+        createdAt: DateTime(2026, 6, 20),
+        finalPrice: 300,
+        paymentMethod: 'cash',
+      ),
+      CustomerRequest(
+        id: 'request-2',
+        serviceName: 'تصليح كهرباء',
+        categoryName: 'كهربائي',
+        area: 'مدينة نصر',
+        status: 'new',
+        offerCount: 0,
+        createdAt: DateTime(2026, 6, 19),
+      ),
+    ]);
+
+    await tester.pumpWidget(
+      TestApp(
+        child: Scaffold(
+          body: CustomerRequestsPage(
+            requestsFuture: requests,
+            onReload: () {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('سجل الطلبات'), findsOneWidget);
+    expect(find.text('الكل'), findsOneWidget);
+    expect(find.text('نشطة'), findsOneWidget);
+    expect(find.text('مكتملة'), findsOneWidget);
+    expect(find.text('تركيب خلاط'), findsOneWidget);
+    expect(find.text('تصليح كهرباء'), findsOneWidget);
+
+    await tester.tap(find.text('مكتملة'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('تركيب خلاط'), findsOneWidget);
+    expect(find.text('تصليح كهرباء'), findsNothing);
+  });
+
+  testWidgets('worker history page shows review tabs', (tester) async {
+    final requests = Future.value([
+      AcceptedWorkerRequest(
+        id: 'request-1',
+        serviceName: 'تركيب خلاط',
+        categoryName: 'سباك',
+        description: 'محتاج تركيب خلاط',
+        governorate: 'القاهرة',
+        area: 'مدينة نصر',
+        address: 'شارع 1',
+        preferredTime: 'بكرة',
+        status: 'completed',
+        customerName: 'محمد',
+        customerPhone: '01000000000',
+        customerAddress: 'عنوان',
+        acceptedPrice: 300,
+        arrivalTime: 'ساعة',
+        createdAt: DateTime(2026, 6, 20),
+        review: ServiceReview(
+          id: 'review-1',
+          rating: 5,
+          comment: 'شغل ممتاز',
+          createdAt: DateTime(2026, 6, 20),
+        ),
+        finalPrice: 300,
+        paymentMethod: 'cash',
+      ),
+      AcceptedWorkerRequest(
+        id: 'request-2',
+        serviceName: 'تصليح كهرباء',
+        categoryName: 'كهربائي',
+        description: 'عطل في الأسلاك',
+        governorate: 'القاهرة',
+        area: 'مدينة نصر',
+        address: 'شارع 2',
+        preferredTime: 'النهارده',
+        status: 'completed',
+        customerName: 'أحمد',
+        customerPhone: '01000000001',
+        customerAddress: 'عنوان 2',
+        acceptedPrice: 200,
+        arrivalTime: 'ساعتين',
+        createdAt: DateTime(2026, 6, 19),
+        review: null,
+        finalPrice: 200,
+        paymentMethod: 'cash',
+      ),
+    ]);
+
+    await tester.pumpWidget(
+      TestApp(
+        child: Scaffold(
+          body: WorkerHistoryPage(
+            completedRequestsFuture: requests,
+            onReload: () {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('سجل الأعمال'), findsOneWidget);
+    expect(find.text('بها تقييم'), findsOneWidget);
+    expect(find.text('تركيب خلاط'), findsOneWidget);
+
+    await tester.tap(find.text('بها تقييم'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('تركيب خلاط'), findsOneWidget);
+    expect(find.text('شغل ممتاز'), findsOneWidget);
+
+    await tester.tap(find.text('بدون تقييم'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('تصليح كهرباء'), findsOneWidget);
+    expect(find.text('العميل لم يقيّم الخدمة بعد.'), findsOneWidget);
+  });
+
+  testWidgets('in progress worker request shows completion form', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      TestApp(
+        child: Scaffold(
+          body: SingleChildScrollView(
+            child: AcceptedRequestCard(
+              request: AcceptedWorkerRequest(
+                id: 'request-1',
+                serviceName: 'تركيب خلاط',
+                categoryName: 'سباك',
+                description: 'محتاج تركيب خلاط جديد',
+                governorate: 'القاهرة',
+                area: 'مدينة نصر',
+                address: 'شارع رئيسي',
+                preferredTime: 'بكرة صباحًا',
+                status: 'in_progress',
+                customerName: 'محمد العميل',
+                customerPhone: '01000000000',
+                customerAddress: 'عنوان العميل',
+                acceptedPrice: 300,
+                arrivalTime: 'خلال ساعة',
+                createdAt: DateTime(2026, 6, 20),
+                review: null,
+              ),
+              isMarkingOnTheWay: false,
+              isStarting: false,
+              isCompleting: false,
+              onMarkOnTheWay: () {},
+              onStartWork: () {},
+              onCompleteWork: (code, price) {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('تأكيد الإتمام'), findsOneWidget);
+    expect(find.text('كود الإتمام'), findsOneWidget);
+    expect(find.text('المبلغ المستلم كاش (جنيه)'), findsOneWidget);
   });
 }
 

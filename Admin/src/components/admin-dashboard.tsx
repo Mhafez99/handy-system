@@ -2,7 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
+import { OverviewPanel } from "@/components/overview-panel";
 import { AreasPanel } from "@/components/areas-panel";
+import { ComplaintsPanel } from "@/components/complaints-panel";
+import { ServicesPanel } from "@/components/services-panel";
+import { UsersPanel } from "@/components/users-panel";
 import {
   approveWorker,
   loadPendingWorkers,
@@ -16,11 +20,17 @@ type ActionState = {
   type: "approve" | "reject";
 } | null;
 
-type AdminTab = "workers" | "areas";
+type AdminTab =
+  | "overview"
+  | "workers"
+  | "users"
+  | "services"
+  | "areas"
+  | "complaints";
 
 export function AdminDashboard() {
   const [session, setSession] = useState<Session | null>(null);
-  const [activeTab, setActiveTab] = useState<AdminTab>("workers");
+  const [activeTab, setActiveTab] = useState<AdminTab>("overview");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [workers, setWorkers] = useState<PendingWorker[]>([]);
@@ -30,7 +40,28 @@ export function AdminDashboard() {
   const [actionState, setActionState] = useState<ActionState>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [overviewRefreshToken, setOverviewRefreshToken] = useState(0);
+  const [usersRefreshToken, setUsersRefreshToken] = useState(0);
+  const [servicesRefreshToken, setServicesRefreshToken] = useState(0);
   const [areasRefreshToken, setAreasRefreshToken] = useState(0);
+  const [complaintsRefreshToken, setComplaintsRefreshToken] = useState(0);
+
+  const tabTitle = useMemo(() => {
+    switch (activeTab) {
+      case "overview":
+        return "لوحة المتابعة";
+      case "workers":
+        return "اعتماد الصنايعية";
+      case "users":
+        return "إدارة المستخدمين";
+      case "services":
+        return "إدارة الخدمات";
+      case "areas":
+        return "إدارة المناطق";
+      case "complaints":
+        return "مراجعة الشكاوى";
+    }
+  }, [activeTab]);
 
   const adminEmail = useMemo(() => session?.user.email ?? "", [session]);
 
@@ -201,18 +232,46 @@ export function AdminDashboard() {
       <header className="topbar">
         <div>
           <p className="eyebrow">Handy Admin</p>
-          <h1>{activeTab === "workers" ? "اعتماد الصنايعية" : "إدارة المناطق"}</h1>
+          <h1>{tabTitle}</h1>
           <p className="muted">مسجل كـ {adminEmail}</p>
         </div>
         <div className="topbar-actions">
-          {activeTab === "workers" ? (
+          {activeTab === "overview" ? (
+            <button
+              className="secondary-button"
+              onClick={() => setOverviewRefreshToken((current) => current + 1)}
+            >
+              تحديث
+            </button>
+          ) : activeTab === "workers" ? (
             <button className="secondary-button" onClick={refreshWorkers}>
+              تحديث
+            </button>
+          ) : activeTab === "users" ? (
+            <button
+              className="secondary-button"
+              onClick={() => setUsersRefreshToken((current) => current + 1)}
+            >
+              تحديث
+            </button>
+          ) : activeTab === "services" ? (
+            <button
+              className="secondary-button"
+              onClick={() => setServicesRefreshToken((current) => current + 1)}
+            >
+              تحديث
+            </button>
+          ) : activeTab === "areas" ? (
+            <button
+              className="secondary-button"
+              onClick={() => setAreasRefreshToken((current) => current + 1)}
+            >
               تحديث
             </button>
           ) : (
             <button
               className="secondary-button"
-              onClick={() => setAreasRefreshToken((current) => current + 1)}
+              onClick={() => setComplaintsRefreshToken((current) => current + 1)}
             >
               تحديث
             </button>
@@ -225,6 +284,18 @@ export function AdminDashboard() {
 
       <nav className="admin-tabs" aria-label="أقسام لوحة الإدارة">
         <button
+          className={
+            activeTab === "overview" ? "tab-button active" : "tab-button"
+          }
+          onClick={() => {
+            setActiveTab("overview");
+            setMessage("");
+            setError("");
+          }}
+        >
+          المتابعة
+        </button>
+        <button
           className={activeTab === "workers" ? "tab-button active" : "tab-button"}
           onClick={() => {
             setActiveTab("workers");
@@ -233,6 +304,28 @@ export function AdminDashboard() {
           }}
         >
           الصنايعية
+        </button>
+        <button
+          className={activeTab === "users" ? "tab-button active" : "tab-button"}
+          onClick={() => {
+            setActiveTab("users");
+            setMessage("");
+            setError("");
+          }}
+        >
+          المستخدمون
+        </button>
+        <button
+          className={
+            activeTab === "services" ? "tab-button active" : "tab-button"
+          }
+          onClick={() => {
+            setActiveTab("services");
+            setMessage("");
+            setError("");
+          }}
+        >
+          الخدمات
         </button>
         <button
           className={activeTab === "areas" ? "tab-button active" : "tab-button"}
@@ -244,11 +337,28 @@ export function AdminDashboard() {
         >
           المناطق
         </button>
+        <button
+          className={
+            activeTab === "complaints" ? "tab-button active" : "tab-button"
+          }
+          onClick={() => {
+            setActiveTab("complaints");
+            setMessage("");
+            setError("");
+          }}
+        >
+          الشكاوى
+        </button>
       </nav>
 
       <Feedback message={message} error={error} />
 
-      {activeTab === "workers" ? (
+      {activeTab === "overview" ? (
+        <OverviewPanel
+          refreshToken={overviewRefreshToken}
+          onError={setError}
+        />
+      ) : activeTab === "workers" ? (
         <>
           <section className="stats-grid">
             <article className="stat-card">
@@ -284,9 +394,27 @@ export function AdminDashboard() {
             )}
           </section>
         </>
-      ) : (
+      ) : activeTab === "users" ? (
+        <UsersPanel
+          refreshToken={usersRefreshToken}
+          onMessage={setMessage}
+          onError={setError}
+        />
+      ) : activeTab === "services" ? (
+        <ServicesPanel
+          refreshToken={servicesRefreshToken}
+          onMessage={setMessage}
+          onError={setError}
+        />
+      ) : activeTab === "areas" ? (
         <AreasPanel
           key={areasRefreshToken}
+          onMessage={setMessage}
+          onError={setError}
+        />
+      ) : (
+        <ComplaintsPanel
+          refreshToken={complaintsRefreshToken}
           onMessage={setMessage}
           onError={setError}
         />

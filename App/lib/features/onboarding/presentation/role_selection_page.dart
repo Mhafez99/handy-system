@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:handy_app/features/auth/domain/account_role.dart';
 import 'package:handy_app/features/auth/presentation/login_page.dart';
 import 'package:handy_app/features/auth/presentation/registration_page.dart';
+import 'package:handy_app/features/legal/presentation/legal_links_row.dart';
 
 class RoleSelectionPage extends StatefulWidget {
   const RoleSelectionPage({super.key});
@@ -107,6 +108,8 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
                     },
                     child: const Text('عندي حساب بالفعل'),
                   ),
+                  const SizedBox(height: 8),
+                  const Center(child: LegalLinksRow()),
                 ],
               ),
             ),

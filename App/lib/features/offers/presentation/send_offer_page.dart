@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:handy_app/features/offers/data/offers_repository.dart';
 import 'package:handy_app/features/offers/domain/create_offer_data.dart';
+import 'package:handy_app/features/requests/data/service_requests_repository.dart';
 import 'package:handy_app/features/requests/domain/available_worker_request.dart';
+import 'package:handy_app/features/requests/domain/request_image.dart';
+import 'package:handy_app/features/requests/presentation/request_image_widgets.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SendOfferPage extends StatefulWidget {
@@ -17,11 +20,19 @@ class SendOfferPage extends StatefulWidget {
 class _SendOfferPageState extends State<SendOfferPage> {
   final formKey = GlobalKey<FormState>();
   final repository = OffersRepository();
+  final requestsRepository = ServiceRequestsRepository();
   final priceController = TextEditingController();
   final arrivalTimeController = TextEditingController(text: 'خلال ساعة');
   final noteController = TextEditingController();
 
+  late Future<List<RequestImage>> imagesFuture;
   bool isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    imagesFuture = requestsRepository.loadRequestImages(widget.request.id);
+  }
 
   @override
   void dispose() {
@@ -106,6 +117,24 @@ class _SendOfferPageState extends State<SendOfferPage> {
                         ),
                         const SizedBox(height: 8),
                         Text(widget.request.description),
+                        const SizedBox(height: 12),
+                        FutureBuilder<List<RequestImage>>(
+                          future: imagesFuture,
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return const LinearProgressIndicator();
+                            }
+
+                            if (snapshot.hasError) {
+                              return const Text('تعذر تحميل صور الطلب.');
+                            }
+
+                            return RequestImagesGallery(
+                              images: snapshot.data ?? const [],
+                            );
+                          },
+                        ),
                       ],
                     ),
                   ),

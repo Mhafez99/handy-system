@@ -1,5 +1,7 @@
+import 'package:handy_app/features/complaints/domain/service_complaint.dart';
 import 'package:handy_app/features/offers/domain/service_offer.dart';
 import 'package:handy_app/features/reviews/domain/service_review.dart';
+import 'package:handy_app/features/requests/domain/request_image.dart';
 
 class ServiceRequestDetails {
   const ServiceRequestDetails({
@@ -16,6 +18,11 @@ class ServiceRequestDetails {
     required this.createdAt,
     required this.offers,
     required this.review,
+    required this.images,
+    this.completionCode,
+    this.finalPrice,
+    this.paymentMethod,
+    this.complaint,
   });
 
   final String id;
@@ -31,6 +38,28 @@ class ServiceRequestDetails {
   final DateTime createdAt;
   final List<ServiceOffer> offers;
   final ServiceReview? review;
+  final List<RequestImage> images;
+  final String? completionCode;
+  final int? finalPrice;
+  final String? paymentMethod;
+  final ServiceComplaint? complaint;
+
+  String get paymentMethodLabel {
+    return switch (paymentMethod) {
+      'cash' => 'كاش',
+      _ => paymentMethod ?? '',
+    };
+  }
+
+  int? get acceptedOfferPrice {
+    for (final offer in offers) {
+      if (offer.status == 'accepted') {
+        return offer.price;
+      }
+    }
+
+    return null;
+  }
 
   ServiceRequestDetails withOffers(List<ServiceOffer> nextOffers) {
     return ServiceRequestDetails(
@@ -47,6 +76,34 @@ class ServiceRequestDetails {
       createdAt: createdAt,
       offers: nextOffers,
       review: review,
+      images: images,
+      completionCode: completionCode,
+      finalPrice: finalPrice,
+      paymentMethod: paymentMethod,
+      complaint: complaint,
+    );
+  }
+
+  ServiceRequestDetails withImages(List<RequestImage> nextImages) {
+    return ServiceRequestDetails(
+      id: id,
+      serviceName: serviceName,
+      categoryName: categoryName,
+      priceRange: priceRange,
+      description: description,
+      governorate: governorate,
+      area: area,
+      address: address,
+      preferredTime: preferredTime,
+      status: status,
+      createdAt: createdAt,
+      offers: offers,
+      review: review,
+      images: nextImages,
+      completionCode: completionCode,
+      finalPrice: finalPrice,
+      paymentMethod: paymentMethod,
+      complaint: complaint,
     );
   }
 
@@ -57,6 +114,7 @@ class ServiceRequestDetails {
     final maxPrice = service['max_price'] as int?;
     final rawOffers = json['offers'] as List<dynamic>? ?? [];
     final rawReviews = json['service_reviews'] as List<dynamic>? ?? [];
+    final rawComplaints = json['service_complaints'] as List<dynamic>? ?? [];
 
     return ServiceRequestDetails(
       id: json['id'] as String,
@@ -78,6 +136,15 @@ class ServiceRequestDetails {
       review: rawReviews.isEmpty
           ? null
           : ServiceReview.fromJson(rawReviews.first as Map<String, dynamic>),
+      images: const [],
+      completionCode: json['completion_code'] as String?,
+      finalPrice: json['final_price'] as int?,
+      paymentMethod: json['payment_method'] as String?,
+      complaint: rawComplaints.isEmpty
+          ? null
+          : ServiceComplaint.fromJson(
+              rawComplaints.first as Map<String, dynamic>,
+            ),
     );
   }
 }

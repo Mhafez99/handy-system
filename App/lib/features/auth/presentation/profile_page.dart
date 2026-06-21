@@ -5,6 +5,7 @@ import 'package:handy_app/features/areas/presentation/area_picker_fields.dart';
 import 'package:handy_app/features/auth/data/auth_repository.dart';
 import 'package:handy_app/features/auth/domain/update_profile_data.dart';
 import 'package:handy_app/features/auth/presentation/registration_page.dart';
+import 'package:handy_app/features/legal/presentation/legal_links_row.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -286,6 +287,8 @@ class _ProfilePageState extends State<ProfilePage> {
             ],
           ),
         ],
+        const SizedBox(height: 16),
+        const LegalMenuCard(),
       ],
     );
   }

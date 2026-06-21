@@ -6,6 +6,7 @@ import 'package:handy_app/features/auth/data/auth_repository.dart';
 import 'package:handy_app/features/auth/domain/account_role.dart';
 import 'package:handy_app/features/auth/domain/registration_data.dart';
 import 'package:handy_app/features/auth/presentation/login_page.dart';
+import 'package:handy_app/features/legal/presentation/legal_links_row.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RegistrationPage extends StatefulWidget {
@@ -261,14 +262,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   ),
                 ],
                 const SizedBox(height: 12),
-                CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
+                LegalAgreementCheckbox(
                   value: acceptedTerms,
                   onChanged: (value) {
                     setState(() => acceptedTerms = value ?? false);
                   },
-                  controlAffinity: ListTileControlAffinity.leading,
-                  title: const Text('أوافق على شروط الاستخدام وسياسة الخصوصية'),
                 ),
                 const SizedBox(height: 16),
                 FilledButton(

@@ -1,3 +1,4 @@
+import 'package:handy_app/core/push/push_notification_service.dart';
 import 'package:handy_app/features/auth/domain/registration_data.dart';
 import 'package:handy_app/features/auth/domain/update_profile_data.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -93,7 +94,8 @@ class AuthRepository {
     }
   }
 
-  Future<void> signOut() {
-    return _client.auth.signOut();
+  Future<void> signOut() async {
+    await PushNotificationService.instance.unregisterCurrentToken();
+    await _client.auth.signOut();
   }
 }

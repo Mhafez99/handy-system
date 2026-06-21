@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:handy_app/features/auth/data/auth_repository.dart';
 import 'package:handy_app/features/auth/presentation/profile_page.dart';
-import 'package:handy_app/features/customer/presentation/customer_home_page.dart';
-import 'package:handy_app/features/worker/presentation/worker_home_page.dart';
+import 'package:handy_app/features/customer/presentation/customer_shell_page.dart';
+import 'package:handy_app/features/worker/presentation/worker_shell_page.dart';
 
 class AccountHomePage extends StatefulWidget {
   const AccountHomePage({super.key});
@@ -62,7 +62,7 @@ class _AccountHomePageState extends State<AccountHomePage> {
 
         final profile = snapshot.data!;
         if (profile['role'] == 'customer') {
-          return CustomerHomePage(
+          return CustomerShellPage(
             profile: profile,
             onSignOut: repository.signOut,
             onProfileChanged: reloadProfile,
@@ -70,7 +70,7 @@ class _AccountHomePageState extends State<AccountHomePage> {
         }
 
         if (profile['status'] == 'active') {
-          return WorkerHomePage(
+          return WorkerShellPage(
             profile: profile,
             onSignOut: repository.signOut,
             onProfileChanged: reloadProfile,

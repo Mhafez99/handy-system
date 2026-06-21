@@ -7,6 +7,8 @@ class CustomerRequest {
     required this.status,
     required this.offerCount,
     required this.createdAt,
+    this.finalPrice,
+    this.paymentMethod,
   });
 
   final String id;
@@ -16,6 +18,15 @@ class CustomerRequest {
   final String status;
   final int offerCount;
   final DateTime createdAt;
+  final int? finalPrice;
+  final String? paymentMethod;
+
+  String get paymentMethodLabel {
+    return switch (paymentMethod) {
+      'cash' => 'كاش',
+      _ => paymentMethod ?? '',
+    };
+  }
 
   factory CustomerRequest.fromJson(Map<String, dynamic> json) {
     final service = json['services'] as Map<String, dynamic>? ?? {};
@@ -28,8 +39,10 @@ class CustomerRequest {
       categoryName: category['name'] as String? ?? 'تخصص غير محدد',
       area: json['area'] as String? ?? '',
       status: json['status'] as String? ?? 'new',
-      offerCount: offers.length,
+      offerCount: json['offer_count'] as int? ?? offers.length,
       createdAt: DateTime.parse(json['created_at'] as String),
+      finalPrice: json['final_price'] as int?,
+      paymentMethod: json['payment_method'] as String?,
     );
   }
 }

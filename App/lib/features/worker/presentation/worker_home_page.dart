@@ -1,22 +1,25 @@
 import 'package:flutter/material.dart';
-import 'package:handy_app/features/auth/presentation/profile_page.dart';
+import 'package:flutter/services.dart';
 import 'package:handy_app/features/offers/presentation/send_offer_page.dart';
 import 'package:handy_app/features/requests/data/service_requests_repository.dart';
 import 'package:handy_app/features/requests/domain/accepted_worker_request.dart';
 import 'package:handy_app/features/requests/domain/available_worker_request.dart';
+import 'package:handy_app/features/requests/presentation/payment_summary_widgets.dart';
 import 'package:handy_app/features/reviews/domain/service_review.dart';
 
 class WorkerHomePage extends StatefulWidget {
   const WorkerHomePage({
     required this.profile,
-    required this.onSignOut,
-    required this.onProfileChanged,
+    required this.availableRequestsFuture,
+    required this.activeRequestsFuture,
+    required this.onReload,
     super.key,
   });
 
   final Map<String, dynamic> profile;
-  final Future<void> Function() onSignOut;
-  final VoidCallback onProfileChanged;
+  final Future<List<AvailableWorkerRequest>> availableRequestsFuture;
+  final Future<List<AcceptedWorkerRequest>> activeRequestsFuture;
+  final VoidCallback onReload;
 
   @override
   State<WorkerHomePage> createState() => _WorkerHomePageState();
@@ -24,32 +27,12 @@ class WorkerHomePage extends StatefulWidget {
 
 class _WorkerHomePageState extends State<WorkerHomePage> {
   final repository = ServiceRequestsRepository();
-  late Future<List<AvailableWorkerRequest>> requestsFuture;
-  late Future<List<AcceptedWorkerRequest>> acceptedRequestsFuture;
+  String? markingOnTheWayRequestId;
   String? startingRequestId;
-
-  @override
-  void initState() {
-    super.initState();
-    requestsFuture = repository.loadAvailableWorkerRequests();
-    acceptedRequestsFuture = repository.loadAcceptedWorkerRequests();
-  }
+  String? completingRequestId;
 
   void reloadRequests() {
-    setState(() {
-      requestsFuture = repository.loadAvailableWorkerRequests();
-      acceptedRequestsFuture = repository.loadAcceptedWorkerRequests();
-    });
-  }
-
-  Future<void> openProfile() async {
-    final updated = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (context) => const ProfilePage()),
-    );
-
-    if (updated == true) {
-      widget.onProfileChanged();
-    }
+    widget.onReload();
   }
 
   Future<void> openSendOffer(AvailableWorkerRequest request) async {
@@ -59,6 +42,32 @@ class _WorkerHomePageState extends State<WorkerHomePage> {
 
     if (created == true) {
       reloadRequests();
+    }
+  }
+
+  Future<void> markOnTheWay(AcceptedWorkerRequest request) async {
+    setState(() => markingOnTheWayRequestId = request.id);
+
+    try {
+      await repository.markOnTheWay(request.id);
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم تحديث الطلب إلى في الطريق.')),
+      );
+      reloadRequests();
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر تحديث حالة الطلب. حاول مرة أخرى.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => markingOnTheWayRequestId = null);
+      }
     }
   }
 
@@ -88,35 +97,55 @@ class _WorkerHomePageState extends State<WorkerHomePage> {
     }
   }
 
+  Future<void> completeWork(
+    AcceptedWorkerRequest request,
+    String completionCode,
+    int finalPrice,
+  ) async {
+    setState(() => completingRequestId = request.id);
+
+    try {
+      await repository.completeRequestByWorker(
+        requestId: request.id,
+        completionCode: completionCode,
+        finalPrice: finalPrice,
+      );
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم تأكيد إتمام الخدمة بنجاح.')),
+      );
+      reloadRequests();
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تعذر إتمام الخدمة. تأكد من الكود والسعر وحاول مرة أخرى.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => completingRequestId = null);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('طلبات متاحة'),
-        actions: [
-          IconButton(
-            tooltip: 'الملف الشخصي',
-            onPressed: openProfile,
-            icon: const Icon(Icons.person_outline_rounded),
+    return RefreshIndicator(
+      onRefresh: () async => reloadRequests(),
+      child: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          Text(
+            'أهلًا ${widget.profile['full_name'] ?? ''}',
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
           ),
-          IconButton(
-            tooltip: 'تسجيل الخروج',
-            onPressed: widget.onSignOut,
-            icon: const Icon(Icons.logout_rounded),
-          ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async => reloadRequests(),
-        child: ListView(
-          padding: const EdgeInsets.all(24),
-          children: [
-            Text(
-              'أهلًا ${widget.profile['full_name'] ?? ''}',
-              style: Theme.of(
-                context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
-            ),
             const SizedBox(height: 8),
             Text(
               'هنا تظهر طلبات نفس تخصصك ونفس منطقتك بعد اعتماد حسابك.',
@@ -140,7 +169,7 @@ class _WorkerHomePageState extends State<WorkerHomePage> {
             ),
             const SizedBox(height: 12),
             FutureBuilder<List<AcceptedWorkerRequest>>(
-              future: acceptedRequestsFuture,
+              future: widget.activeRequestsFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Padding(
@@ -168,8 +197,14 @@ class _WorkerHomePageState extends State<WorkerHomePage> {
                         padding: const EdgeInsets.only(bottom: 12),
                         child: AcceptedRequestCard(
                           request: request,
+                          isMarkingOnTheWay:
+                              markingOnTheWayRequestId == request.id,
                           isStarting: startingRequestId == request.id,
+                          isCompleting: completingRequestId == request.id,
+                          onMarkOnTheWay: () => markOnTheWay(request),
                           onStartWork: () => startWork(request),
+                          onCompleteWork: (code, price) =>
+                              completeWork(request, code, price),
                         ),
                       ),
                   ],
@@ -185,7 +220,7 @@ class _WorkerHomePageState extends State<WorkerHomePage> {
             ),
             const SizedBox(height: 12),
             FutureBuilder<List<AvailableWorkerRequest>>(
-              future: requestsFuture,
+              future: widget.availableRequestsFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Padding(
@@ -220,8 +255,7 @@ class _WorkerHomePageState extends State<WorkerHomePage> {
                 );
               },
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -268,18 +302,29 @@ class InfoCard extends StatelessWidget {
 class AcceptedRequestCard extends StatelessWidget {
   const AcceptedRequestCard({
     required this.request,
+    required this.isMarkingOnTheWay,
     required this.isStarting,
+    required this.isCompleting,
+    required this.onMarkOnTheWay,
     required this.onStartWork,
+    required this.onCompleteWork,
     super.key,
   });
 
   final AcceptedWorkerRequest request;
+  final bool isMarkingOnTheWay;
   final bool isStarting;
+  final bool isCompleting;
+  final VoidCallback onMarkOnTheWay;
   final VoidCallback onStartWork;
+  final void Function(String completionCode, int finalPrice) onCompleteWork;
 
   @override
   Widget build(BuildContext context) {
-    final canStart = request.status == 'accepted';
+    final canMarkOnTheWay = request.status == 'accepted';
+    final canStart = request.status == 'on_the_way';
+    final canComplete = request.status == 'in_progress';
+    final isBusy = isMarkingOnTheWay || isStarting || isCompleting;
 
     return Card(
       color: Theme.of(context).colorScheme.primaryContainer,
@@ -346,9 +391,20 @@ class AcceptedRequestCard extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 16),
-            if (canStart)
+            if (canMarkOnTheWay)
               FilledButton.icon(
-                onPressed: isStarting ? null : onStartWork,
+                onPressed: isBusy ? null : onMarkOnTheWay,
+                icon: isMarkingOnTheWay
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.directions_walk_outlined),
+                label: const Text('في الطريق'),
+              )
+            else if (canStart)
+              FilledButton.icon(
+                onPressed: isBusy ? null : onStartWork,
                 icon: isStarting
                     ? const SizedBox.square(
                         dimension: 18,
@@ -357,11 +413,11 @@ class AcceptedRequestCard extends StatelessWidget {
                     : const Icon(Icons.play_circle_outline),
                 label: const Text('بدأت الشغل'),
               )
-            else if (request.status == 'in_progress')
-              FilledButton.icon(
-                onPressed: null,
-                icon: const Icon(Icons.construction_outlined),
-                label: const Text('الشغل قيد التنفيذ'),
+            else if (canComplete)
+              CompleteWorkSection(
+                acceptedPrice: request.acceptedPrice,
+                isCompleting: isCompleting,
+                onComplete: onCompleteWork,
               ),
             if (request.review != null) ...[
               const SizedBox(height: 16),
@@ -370,6 +426,111 @@ class AcceptedRequestCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class CompleteWorkSection extends StatefulWidget {
+  const CompleteWorkSection({
+    required this.acceptedPrice,
+    required this.isCompleting,
+    required this.onComplete,
+    super.key,
+  });
+
+  final int acceptedPrice;
+  final bool isCompleting;
+  final void Function(String completionCode, int finalPrice) onComplete;
+
+  @override
+  State<CompleteWorkSection> createState() => _CompleteWorkSectionState();
+}
+
+class _CompleteWorkSectionState extends State<CompleteWorkSection> {
+  final codeController = TextEditingController();
+  late final TextEditingController priceController;
+
+  @override
+  void initState() {
+    super.initState();
+    priceController = TextEditingController(
+      text: widget.acceptedPrice > 0 ? '${widget.acceptedPrice}' : '',
+    );
+  }
+
+  @override
+  void dispose() {
+    codeController.dispose();
+    priceController.dispose();
+    super.dispose();
+  }
+
+  void submit() {
+    final code = codeController.text.trim();
+    final price = int.tryParse(priceController.text.trim());
+
+    if (code.length != 6 || price == null || price <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('أدخل كود إتمام من 6 أرقام وسعرًا نهائيًا صحيحًا.'),
+        ),
+      );
+      return;
+    }
+
+    widget.onComplete(code, price);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'إتمام الخدمة',
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 8),
+        const Text('اطلب كود الإتمام من العميل بعد ما الشغل يخلص.'),
+        const SizedBox(height: 12),
+        WorkerCompletePaymentSection(acceptedPrice: widget.acceptedPrice),
+        const SizedBox(height: 12),
+        TextField(
+          controller: codeController,
+          enabled: !widget.isCompleting,
+          keyboardType: TextInputType.number,
+          maxLength: 6,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: const InputDecoration(
+            labelText: 'كود الإتمام',
+            counterText: '',
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: priceController,
+          enabled: !widget.isCompleting,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: const InputDecoration(
+            labelText: 'المبلغ المستلم كاش (جنيه)',
+            helperText: 'سجّل المبلغ الفعلي اللي استلمته من العميل',
+          ),
+        ),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          onPressed: widget.isCompleting ? null : submit,
+          icon: widget.isCompleting
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.task_alt_outlined),
+          label: const Text('تأكيد الإتمام'),
+        ),
+      ],
     );
   }
 }
@@ -425,6 +586,7 @@ class WorkerReviewSummaryCard extends StatelessWidget {
 
 String requestStatusLabel(String status) {
   return switch (status) {
+    'on_the_way' => 'في الطريق',
     'in_progress' => 'قيد التنفيذ',
     'completed' => 'مكتمل',
     _ => 'مقبول',

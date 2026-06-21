@@ -18,6 +18,8 @@ class AcceptedWorkerRequest {
     required this.arrivalTime,
     required this.createdAt,
     required this.review,
+    this.finalPrice,
+    this.paymentMethod,
   });
 
   final String id;
@@ -36,6 +38,8 @@ class AcceptedWorkerRequest {
   final String arrivalTime;
   final DateTime createdAt;
   final ServiceReview? review;
+  final int? finalPrice;
+  final String? paymentMethod;
 
   factory AcceptedWorkerRequest.fromJson(Map<String, dynamic> json) {
     final service = json['services'] as Map<String, dynamic>? ?? {};
@@ -66,6 +70,8 @@ class AcceptedWorkerRequest {
       review: rawReviews.isEmpty
           ? null
           : ServiceReview.fromJson(rawReviews.first as Map<String, dynamic>),
+      finalPrice: json['final_price'] as int?,
+      paymentMethod: json['payment_method'] as String?,
     );
   }
 }
