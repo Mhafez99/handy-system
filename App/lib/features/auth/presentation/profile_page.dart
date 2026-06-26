@@ -6,6 +6,8 @@ import 'package:handy_app/features/auth/data/auth_repository.dart';
 import 'package:handy_app/features/auth/domain/update_profile_data.dart';
 import 'package:handy_app/features/auth/presentation/registration_page.dart';
 import 'package:handy_app/features/legal/presentation/legal_links_row.dart';
+import 'package:handy_app/features/requests/data/service_requests_repository.dart';
+import 'package:handy_app/features/requests/domain/service_category.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -16,9 +18,8 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  static const professions = ['سباك', 'كهربائي', 'نجار', 'نقاش', 'فني تكييف'];
-
   final repository = AuthRepository();
+  final catalogRepository = ServiceRequestsRepository();
   final formKey = GlobalKey<FormState>();
   final fullNameController = TextEditingController();
   final phoneController = TextEditingController();
@@ -27,6 +28,7 @@ class _ProfilePageState extends State<ProfilePage> {
   final bioController = TextEditingController();
 
   late Future<_ProfileViewData> profileFuture;
+  late Future<List<ServiceCategory>> categoriesFuture;
   bool isEditing = false;
   bool isSaving = false;
   Area? selectedArea;
@@ -36,6 +38,7 @@ class _ProfilePageState extends State<ProfilePage> {
   void initState() {
     super.initState();
     profileFuture = _loadProfile();
+    categoriesFuture = catalogRepository.loadCategories();
   }
 
   Future<_ProfileViewData> _loadProfile() async {
@@ -356,27 +359,44 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             if (isWorker) ...[
               const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                initialValue: selectedProfession,
-                decoration: const InputDecoration(
-                  labelText: 'التخصص',
-                  prefixIcon: Icon(Icons.handyman_outlined),
-                ),
-                items: professions
-                    .map(
-                      (profession) => DropdownMenuItem(
-                        value: profession,
-                        child: Text(profession),
-                      ),
-                    )
-                    .toList(),
-                onChanged: isSaving
-                    ? null
-                    : (value) {
-                        setState(() => selectedProfession = value);
-                      },
-                validator: (value) =>
-                    value == null ? 'اختر التخصص' : null,
+              FutureBuilder<List<ServiceCategory>>(
+                future: categoriesFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const LinearProgressIndicator();
+                  }
+                  if (snapshot.hasError) {
+                    return const Text('تعذر تحميل التخصصات.');
+                  }
+
+                  final categories = snapshot.data ?? const [];
+                  if (categories.isEmpty) {
+                    return const Text('لا توجد تخصصات متاحة حاليًا.');
+                  }
+
+                  return DropdownButtonFormField<String>(
+                    initialValue: selectedProfession,
+                    decoration: const InputDecoration(
+                      labelText: 'التخصص',
+                      prefixIcon: Icon(Icons.handyman_outlined),
+                    ),
+                    items: categories
+                        .map(
+                          (category) => DropdownMenuItem(
+                            value: category.name,
+                            child: Text(category.name),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: isSaving
+                        ? null
+                        : (value) {
+                            setState(() => selectedProfession = value);
+                          },
+                    validator: (value) =>
+                        value == null ? 'اختر التخصص' : null,
+                  );
+                },
               ),
               const SizedBox(height: 16),
               TextFormField(

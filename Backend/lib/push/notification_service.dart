@@ -102,21 +102,22 @@ class NotificationService {
     }
   }
 
-  Future<String?> _loadRequestCustomerId(String requestId) async {
-    final connection = await _database.connect();
-    final result = await connection.execute(
-      Sql.named('''
-        select customer_id
-        from public.service_requests
-        where id = @requestId::uuid
-      '''),
-      parameters: {'requestId': requestId},
-    );
+  Future<String?> _loadRequestCustomerId(String requestId) {
+    return _database.withConnection((connection) async {
+      final result = await connection.execute(
+        Sql.named('''
+          select customer_id
+          from public.service_requests
+          where id = @requestId::uuid
+        '''),
+        parameters: {'requestId': requestId},
+      );
 
-    if (result.isEmpty) {
-      return null;
-    }
+      if (result.isEmpty) {
+        return null;
+      }
 
-    return result.first[0]?.toString();
+      return result.first[0]?.toString();
+    });
   }
 }

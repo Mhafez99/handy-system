@@ -29,6 +29,31 @@ mixin AutoRefreshOnResume<T extends StatefulWidget> on State<T> {
       _ResumeObserver(onResumed: onRefresh);
 }
 
+mixin PeriodicRefresh<T extends StatefulWidget> on State<T> {
+  Timer? _periodicRefreshTimer;
+
+  Duration get refreshInterval => const Duration(seconds: 30);
+
+  @override
+  void initState() {
+    super.initState();
+    _periodicRefreshTimer = Timer.periodic(refreshInterval, (_) {
+      if (!mounted) {
+        return;
+      }
+      onPeriodicRefresh();
+    });
+  }
+
+  @override
+  void dispose() {
+    _periodicRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  void onPeriodicRefresh();
+}
+
 class _ResumeObserver with WidgetsBindingObserver {
   _ResumeObserver({required this.onResumed});
 

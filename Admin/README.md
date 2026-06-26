@@ -26,6 +26,16 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 
 لا تستخدم `service_role` في هذا المشروع.
 
+## إعداد Handy API (اختياري)
+
+لتوجيه اللوحة عبر Backend API بدل Supabase RPC مباشرة:
+
+```env
+NEXT_PUBLIC_HANDY_API_URL=http://localhost:8080
+```
+
+يظل تسجيل الدخول عبر Supabase Auth. الـ API يتحقق من JWT + جدول `admin_users`.
+
 ## SQL المطلوب
 
 نفذ في Supabase SQL Editor:

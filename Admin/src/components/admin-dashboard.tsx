@@ -5,6 +5,7 @@ import type { Session } from "@supabase/supabase-js";
 import { OverviewPanel } from "@/components/overview-panel";
 import { AreasPanel } from "@/components/areas-panel";
 import { ComplaintsPanel } from "@/components/complaints-panel";
+import { ReviewsPanel } from "@/components/reviews-panel";
 import { ServicesPanel } from "@/components/services-panel";
 import { UsersPanel } from "@/components/users-panel";
 import {
@@ -26,7 +27,8 @@ type AdminTab =
   | "users"
   | "services"
   | "areas"
-  | "complaints";
+  | "complaints"
+  | "reviews";
 
 export function AdminDashboard() {
   const [session, setSession] = useState<Session | null>(null);
@@ -45,6 +47,7 @@ export function AdminDashboard() {
   const [servicesRefreshToken, setServicesRefreshToken] = useState(0);
   const [areasRefreshToken, setAreasRefreshToken] = useState(0);
   const [complaintsRefreshToken, setComplaintsRefreshToken] = useState(0);
+  const [reviewsRefreshToken, setReviewsRefreshToken] = useState(0);
 
   const tabTitle = useMemo(() => {
     switch (activeTab) {
@@ -60,6 +63,8 @@ export function AdminDashboard() {
         return "إدارة المناطق";
       case "complaints":
         return "مراجعة الشكاوى";
+      case "reviews":
+        return "تقييمات الصنايعية";
     }
   }, [activeTab]);
 
@@ -268,6 +273,13 @@ export function AdminDashboard() {
             >
               تحديث
             </button>
+          ) : activeTab === "reviews" ? (
+            <button
+              className="secondary-button"
+              onClick={() => setReviewsRefreshToken((current) => current + 1)}
+            >
+              تحديث
+            </button>
           ) : (
             <button
               className="secondary-button"
@@ -349,6 +361,18 @@ export function AdminDashboard() {
         >
           الشكاوى
         </button>
+        <button
+          className={
+            activeTab === "reviews" ? "tab-button active" : "tab-button"
+          }
+          onClick={() => {
+            setActiveTab("reviews");
+            setMessage("");
+            setError("");
+          }}
+        >
+          التقييمات
+        </button>
       </nav>
 
       <Feedback message={message} error={error} />
@@ -409,6 +433,12 @@ export function AdminDashboard() {
       ) : activeTab === "areas" ? (
         <AreasPanel
           key={areasRefreshToken}
+          onMessage={setMessage}
+          onError={setError}
+        />
+      ) : activeTab === "reviews" ? (
+        <ReviewsPanel
+          refreshToken={reviewsRefreshToken}
           onMessage={setMessage}
           onError={setError}
         />

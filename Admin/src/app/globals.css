@@ -562,6 +562,49 @@ select:focus {
   color: var(--muted);
 }
 
+.filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: end;
+}
+
+.filters-row label {
+  display: grid;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.filters-row select {
+  min-width: 140px;
+}
+
+.checkbox-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.checkbox-inline input {
+  width: auto;
+}
+
+.muted-card {
+  opacity: 0.72;
+}
+
+.badge.warning {
+  margin-inline-start: 8px;
+  background: #fff3cd;
+  color: #8a6d3b;
+}
+
+.rating-badge {
+  font-size: 0.95rem;
+  letter-spacing: 1px;
+}
+
 @media (max-width: 720px) {
   .shell {
     width: min(100% - 20px, 1120px);

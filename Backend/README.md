@@ -97,6 +97,76 @@ REDIS_URL=rediss://default:YOUR_TOKEN@YOUR_HOST.upstash.io:6379
 
 عند تجاوز الحد: `429 Too Many Requests` مع رأس `Retry-After`.
 
+راجع `App/docs/scale-deployment.md` لنشر 5,000+ متزامن.
+
+## Connection pool + read replica
+
+```env
+DB_POOL_SIZE=25
+DB_READ_POOL_SIZE=25
+READ_DATABASE_URL=postgresql://...pooler...:6543/postgres
+DB_PREWARM_POOLS=true
+```
+
+## Redis cache
+
+```env
+REDIS_URL=redis://localhost:6379
+CATALOG_CACHE_TTL_SECONDS=300
+WORKER_AVAILABLE_CACHE_TTL_SECONDS=20
+ADMIN_STATS_CACHE_TTL_SECONDS=60
+```
+
+## نشر متعدد الـ instances
+
+```powershell
+cd Backend/deploy
+docker compose up --build
+```
+
+يفتح Nginx على `http://localhost:8080` ويوزّع على 3 instances.
+
+## Admin API
+
+يتطلب JWT + عضوية في `admin_users`.
+
+| Method | Path | الوصف |
+|--------|------|--------|
+| GET | `/v1/admin/overview/stats` | إحصائيات اللوحة (`?from=&to=`) |
+| GET | `/v1/admin/overview/trend` | اتجاه يومي (`?from=&to=`) |
+| GET | `/v1/admin/requests/recent` | آخر الطلبات |
+| GET | `/v1/admin/workers/pending` | صنايعية معلّقين |
+| POST | `/v1/admin/workers/:id/approve` | اعتماد صنايعي |
+| POST | `/v1/admin/workers/:id/reject` | رفض صنايعي |
+| GET | `/v1/admin/areas` | قائمة المناطق |
+| POST | `/v1/admin/areas` | إضافة منطقة |
+| PATCH | `/v1/admin/areas/:id` | تعديل منطقة |
+| GET | `/v1/admin/complaints` | الشكاوى |
+| PATCH | `/v1/admin/complaints/:id` | تحديث حالة شكوى |
+| GET | `/v1/admin/users` | المستخدمون (`?role=&status=`) |
+| PATCH | `/v1/admin/users/:id/status` | تحديث حالة مستخدم |
+| GET | `/v1/admin/categories` | التخصصات |
+| POST | `/v1/admin/categories` | إضافة تخصص |
+| PATCH | `/v1/admin/categories/:id` | تعديل تخصص |
+| GET | `/v1/admin/services` | الخدمات (`?category_id=`) |
+| POST | `/v1/admin/services` | إضافة خدمة |
+| PATCH | `/v1/admin/services/:id` | تعديل خدمة |
+| GET | `/v1/admin/reviews` | تقييمات الصنايعية (`?worker_id=&min_rating=&include_hidden=`) |
+| PATCH | `/v1/admin/reviews/:id` | إخفاء/إظهار تقييم (`is_hidden`) |
+
+## Connection pool
+
+```env
+DB_POOL_SIZE=10
+ADMIN_STATS_CACHE_TTL_SECONDS=60
+```
+
+عند ضبط `REDIS_URL` يُخزَّن cache لـ:
+- `GET /v1/admin/overview/stats`
+- `GET /v1/admin/overview/trend`
+
+TTL افتراضي 60 ثانية، ويُبطَل تلقائيًا بعد أي عملية كتابة admin.
+
 ## Push notifications (FCM)
 
 | Method | Path | الوصف |
@@ -111,6 +181,16 @@ FCM_SERVER_KEY=your-fcm-legacy-server-key
 يُرسل إشعار تلقائيًا بعد: عرض جديد، قبول عرض، تغيير حالة الطلب.
 
 راجع `App/docs/push-notifications-setup.md` لإعداد Firebase في التطبيق.
+
+## ربط لوحة Admin
+
+أضف في `Admin/.env.local`:
+
+```env
+NEXT_PUBLIC_HANDY_API_URL=http://localhost:8080
+```
+
+عند وجود `NEXT_PUBLIC_HANDY_API_URL` تستخدم اللوحة Admin API بدل Supabase RPC.
 
 ## ربط تطبيق Flutter
 

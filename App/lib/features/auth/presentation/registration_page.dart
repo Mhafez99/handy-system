@@ -7,6 +7,8 @@ import 'package:handy_app/features/auth/domain/account_role.dart';
 import 'package:handy_app/features/auth/domain/registration_data.dart';
 import 'package:handy_app/features/auth/presentation/login_page.dart';
 import 'package:handy_app/features/legal/presentation/legal_links_row.dart';
+import 'package:handy_app/features/requests/data/service_requests_repository.dart';
+import 'package:handy_app/features/requests/domain/service_category.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RegistrationPage extends StatefulWidget {
@@ -19,8 +21,6 @@ class RegistrationPage extends StatefulWidget {
 }
 
 class _RegistrationPageState extends State<RegistrationPage> {
-  static const professions = ['سباك', 'كهربائي', 'نجار', 'نقاش', 'فني تكييف'];
-
   final formKey = GlobalKey<FormState>();
   final fullNameController = TextEditingController();
   final phoneController = TextEditingController();
@@ -31,6 +31,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
   final experienceController = TextEditingController();
   final bioController = TextEditingController();
   final repository = AuthRepository();
+  final catalogRepository = ServiceRequestsRepository();
+
+  late final Future<List<ServiceCategory>> categoriesFuture;
 
   String? selectedProfession;
   Area? selectedArea;
@@ -39,6 +42,14 @@ class _RegistrationPageState extends State<RegistrationPage> {
   bool obscurePassword = true;
 
   bool get isWorker => widget.role == AccountRole.worker;
+
+  @override
+  void initState() {
+    super.initState();
+    if (isWorker) {
+      categoriesFuture = catalogRepository.loadCategories();
+    }
+  }
 
   @override
   void dispose() {
@@ -218,28 +229,59 @@ class _RegistrationPageState extends State<RegistrationPage> {
                 ),
                 if (isWorker) ...[
                   const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedProfession,
-                    decoration: const InputDecoration(
-                      labelText: 'التخصص',
-                      prefixIcon: Icon(Icons.handyman_outlined),
-                    ),
-                    items: professions
-                        .map(
-                          (profession) => DropdownMenuItem(
-                            value: profession,
-                            child: Text(profession),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() => selectedProfession = value);
-                    },
-                    validator: (value) {
-                      if (value == null) {
-                        return 'اختر التخصص';
+                  FutureBuilder<List<ServiceCategory>>(
+                    future: categoriesFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const LinearProgressIndicator();
                       }
-                      return null;
+                      if (snapshot.hasError) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Text('تعذر تحميل التخصصات.'),
+                            TextButton(
+                              onPressed: () {
+                                setState(() {
+                                  categoriesFuture =
+                                      catalogRepository.loadCategories();
+                                });
+                              },
+                              child: const Text('إعادة المحاولة'),
+                            ),
+                          ],
+                        );
+                      }
+
+                      final categories = snapshot.data ?? const [];
+                      if (categories.isEmpty) {
+                        return const Text('لا توجد تخصصات متاحة حاليًا.');
+                      }
+
+                      return DropdownButtonFormField<String>(
+                        initialValue: selectedProfession,
+                        decoration: const InputDecoration(
+                          labelText: 'التخصص',
+                          prefixIcon: Icon(Icons.handyman_outlined),
+                        ),
+                        items: categories
+                            .map(
+                              (category) => DropdownMenuItem(
+                                value: category.name,
+                                child: Text(category.name),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (value) {
+                          setState(() => selectedProfession = value);
+                        },
+                        validator: (value) {
+                          if (value == null) {
+                            return 'اختر التخصص';
+                          }
+                          return null;
+                        },
+                      );
                     },
                   ),
                   const SizedBox(height: 16),

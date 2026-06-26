@@ -25,7 +25,7 @@ class WorkerShellPage extends StatefulWidget {
 }
 
 class _WorkerShellPageState extends State<WorkerShellPage>
-    with AutoRefreshOnResume<WorkerShellPage> {
+    with AutoRefreshOnResume<WorkerShellPage>, PeriodicRefresh<WorkerShellPage> {
   final repository = ServiceRequestsRepository();
   late Future<List<AvailableWorkerRequest>> availableRequestsFuture;
   late Future<List<AcceptedWorkerRequest>> activeRequestsFuture;
@@ -43,6 +43,11 @@ class _WorkerShellPageState extends State<WorkerShellPage>
 
   @override
   void onRefresh() {
+    reloadRequests();
+  }
+
+  @override
+  void onPeriodicRefresh() {
     reloadRequests();
   }
 

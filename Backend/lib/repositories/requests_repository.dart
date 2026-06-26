@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:handy_backend/cache/cache_store.dart';
 import 'package:handy_backend/db/database.dart';
 import 'package:handy_backend/errors/request_action_exception.dart';
 import 'package:handy_backend/push/notification_service.dart';
@@ -11,18 +13,33 @@ class RequestsRepository {
     this._database, {
     SupabaseStorageClient? storage,
     NotificationService? notifications,
+    CacheStore? cache,
+    Duration workerAvailableCacheTtl = const Duration(seconds: 20),
   }) : _storage = storage,
-       _notifications = notifications;
+       _notifications = notifications,
+       _cache = cache,
+       _workerAvailableCacheTtl = workerAvailableCacheTtl;
 
   final Database _database;
   final SupabaseStorageClient? _storage;
   final NotificationService? _notifications;
+  final CacheStore? _cache;
+  final Duration _workerAvailableCacheTtl;
 
   static const maxRequestImages = 3;
+  static const maxAvailableWorkerRequests = 100;
 
-  Future<List<Map<String, Object?>>> listCustomerRequests(String userId) async {
-    final connection = await _database.connect();
-    final result = await connection.execute(
+  Future<T> _withDb<T>(Future<T> Function(Connection connection) action) {
+    return _database.withConnection(action);
+  }
+
+  Future<T> _withReadDb<T>(Future<T> Function(Connection connection) action) {
+    return _database.withReadConnection(action);
+  }
+
+  Future<List<Map<String, Object?>>> listCustomerRequests(String userId) {
+    return _withReadDb((connection) async {
+      final result = await connection.execute(
       Sql.named('''
         select
           sr.id,
@@ -47,48 +64,66 @@ class RequestsRepository {
       parameters: {'userId': userId},
     );
 
-    return result.map(_mapCustomerRequestRow).toList(growable: false);
+      return result.map(_mapCustomerRequestRow).toList(growable: false);
+    });
   }
 
   Future<List<Map<String, Object?>>> listAvailableWorkerRequests(
     String userId,
   ) async {
-    final connection = await _database.connect();
-    final result = await connection.execute(
-      Sql.named('''
-        select
-          sr.id,
-          sr.description,
-          sr.area,
-          sr.address,
-          sr.preferred_time,
-          sr.status,
-          sr.created_at,
-          s.name as service_name,
-          c.name as category_name,
-          s.min_price,
-          s.max_price
-        from public.service_requests sr
-        join public.services s on s.id = sr.service_id
-        join public.categories c on c.id = sr.category_id
-        where sr.status in ('new', 'offered')
-          and exists (
-            select 1
-            from public.profiles p
-            join public.worker_profiles wp on wp.user_id = p.id
-            where p.id = @userId::uuid
-              and p.role = 'worker'
-              and p.status = 'active'
-              and wp.approval_status = 'approved'
-              and wp.profession = c.name
-              and p.area = sr.area
-          )
-        order by sr.created_at desc
-      '''),
-      parameters: {'userId': userId},
-    );
+    final cacheKey = 'worker:available:$userId';
+    final cached = await _readCachedRequestList(cacheKey);
+    if (cached != null) {
+      return cached;
+    }
 
-    return result.map(_mapAvailableRequestRow).toList(growable: false);
+    final requests = await _withReadDb((connection) async {
+      final result = await connection.execute(
+        Sql.named('''
+          select
+            sr.id,
+            sr.description,
+            sr.area,
+            sr.address,
+            sr.preferred_time,
+            sr.status,
+            sr.created_at,
+            s.name as service_name,
+            c.name as category_name,
+            s.min_price,
+            s.max_price
+          from public.profiles p
+          join public.worker_profiles wp on wp.user_id = p.id
+          join public.service_requests sr on sr.status in ('new', 'offered')
+          join public.services s on s.id = sr.service_id
+          join public.categories c on c.id = sr.category_id
+          where p.id = @userId::uuid
+            and p.role = 'worker'
+            and p.status = 'active'
+            and wp.approval_status = 'approved'
+            and wp.profession = c.name
+            and (
+              (
+                p.area_id is not null
+                and sr.area_id is not null
+                and p.area_id = sr.area_id
+              )
+              or p.area = sr.area
+            )
+          order by sr.created_at desc
+          limit @limit
+        '''),
+        parameters: {
+          'userId': userId,
+          'limit': maxAvailableWorkerRequests,
+        },
+      );
+
+      return result.map(_mapAvailableRequestRow).toList(growable: false);
+    });
+
+    await _writeCachedRequestList(cacheKey, requests);
+    return requests;
   }
 
   Future<List<Map<String, Object?>>> listActiveWorkerRequests(
@@ -107,11 +142,11 @@ class RequestsRepository {
   }
 
   Future<void> acceptOffer(String userId, String offerId) async {
-    final connection = await _database.connect();
     String? requestId;
     String? workerId;
 
-    await connection.runTx((session) async {
+    await _withDb((connection) async {
+      await connection.runTx((session) async {
       final selection = await session.execute(
         Sql.named('''
           select o.request_id, o.worker_id
@@ -178,6 +213,7 @@ class RequestsRepository {
           'Offer is not available for acceptance',
         );
       }
+      });
     });
 
     final acceptedRequestId = requestId;
@@ -239,8 +275,8 @@ class RequestsRepository {
       throw const RequestActionException('Completion code is required');
     }
 
-    final connection = await _database.connect();
-    final result = await connection.execute(
+    await _withDb((connection) async {
+      final result = await connection.execute(
       Sql.named('''
         update public.service_requests sr
         set status = 'completed',
@@ -271,6 +307,7 @@ class RequestsRepository {
         'Request is not available to complete or code is invalid',
       );
     }
+    });
 
     _notify(
       () => _notifications!.notifyRequestStatusChanged(
@@ -283,9 +320,9 @@ class RequestsRepository {
   Future<Map<String, Object?>> getCustomerRequestDetails(
     String userId,
     String requestId,
-  ) async {
-    final connection = await _database.connect();
-    final requestResult = await connection.execute(
+  ) {
+    return _withReadDb((connection) async {
+      final requestResult = await connection.execute(
       Sql.named('''
         select
           sr.id,
@@ -321,28 +358,29 @@ class RequestsRepository {
     final reviews = await _loadRequestReviews(connection, requestId);
     final complaints = await _loadRequestComplaints(connection, requestId);
 
-    return {
-      'id': requestRow[0]?.toString(),
-      'description': requestRow[1],
-      'governorate': requestRow[2],
-      'area': requestRow[3],
-      'address': requestRow[4],
-      'preferred_time': requestRow[5],
-      'status': requestRow[6],
-      'created_at': _formatTimestamp(requestRow[7]),
-      'completion_code': requestRow[8],
-      'final_price': requestRow[9],
-      'payment_method': requestRow[10],
-      'services': {
-        'name': requestRow[11],
-        'min_price': requestRow[12],
-        'max_price': requestRow[13],
-        'categories': {'name': requestRow[14]},
-      },
-      'offers': offers,
-      'service_reviews': reviews,
-      'service_complaints': complaints,
-    };
+      return {
+        'id': requestRow[0]?.toString(),
+        'description': requestRow[1],
+        'governorate': requestRow[2],
+        'area': requestRow[3],
+        'address': requestRow[4],
+        'preferred_time': requestRow[5],
+        'status': requestRow[6],
+        'created_at': _formatTimestamp(requestRow[7]),
+        'completion_code': requestRow[8],
+        'final_price': requestRow[9],
+        'payment_method': requestRow[10],
+        'services': {
+          'name': requestRow[11],
+          'min_price': requestRow[12],
+          'max_price': requestRow[13],
+          'categories': {'name': requestRow[14]},
+        },
+        'offers': offers,
+        'service_reviews': reviews,
+        'service_complaints': complaints,
+      };
+    });
   }
 
   Future<String> createRequest({
@@ -366,8 +404,8 @@ class RequestsRepository {
       throw const RequestActionException('Description is too short');
     }
 
-    final connection = await _database.connect();
-    final result = await connection.execute(
+    return _withDb((connection) async {
+      final result = await connection.execute(
       Sql.named('''
         insert into public.service_requests (
           customer_id,
@@ -416,7 +454,8 @@ class RequestsRepository {
       throw const RequestActionException('Unable to create request');
     }
 
-    return result.first[0]?.toString() ?? '';
+      return result.first[0]?.toString() ?? '';
+    });
   }
 
   Future<void> createOffer({
@@ -435,8 +474,8 @@ class RequestsRepository {
       throw const RequestActionException('Arrival time is required');
     }
 
-    final connection = await _database.connect();
-    final result = await connection.execute(
+    await _withDb((connection) async {
+      final result = await connection.execute(
       Sql.named('''
         insert into public.offers (
           request_id,
@@ -463,7 +502,14 @@ class RequestsRepository {
             and p.status = 'active'
             and wp.approval_status = 'approved'
             and wp.profession = c.name
-            and p.area = sr.area
+            and (
+              (
+                p.area_id is not null
+                and sr.area_id is not null
+                and p.area_id = sr.area_id
+              )
+              or p.area = sr.area
+            )
         )
       '''),
       parameters: {
@@ -478,13 +524,15 @@ class RequestsRepository {
     if (result.affectedRows == 0) {
       throw const RequestActionException('Offer is not available to create');
     }
+    });
 
+    await _cache?.delete('worker:available:$userId');
     _notify(() => _notifications!.notifyOfferCreated(requestId));
   }
 
-  Future<void> cancelRequest(String userId, String requestId) async {
-    final connection = await _database.connect();
-    final result = await connection.execute(
+  Future<void> cancelRequest(String userId, String requestId) {
+    return _withDb((connection) async {
+      final result = await connection.execute(
       Sql.named('''
         update public.service_requests
         set status = 'cancelled',
@@ -499,6 +547,7 @@ class RequestsRepository {
     if (result.affectedRows == 0) {
       throw const RequestActionException('Request is not available to cancel');
     }
+    });
   }
 
   Future<void> submitServiceComplaint({
@@ -528,9 +577,8 @@ class RequestsRepository {
       throw const RequestActionException('Complaint description is too long');
     }
 
-    final connection = await _database.connect();
-
-    await connection.runTx((session) async {
+    await _withDb((connection) async {
+      await connection.runTx((session) async {
       final workerResult = await session.execute(
         Sql.named('''
           select o.worker_id
@@ -598,6 +646,7 @@ class RequestsRepository {
           'Request is not available for complaint',
         );
       }
+      });
     });
   }
 
@@ -616,8 +665,8 @@ class RequestsRepository {
       throw const RequestActionException('Review comment is too long');
     }
 
-    final connection = await _database.connect();
-    final workerResult = await connection.execute(
+    await _withDb((connection) async {
+      final workerResult = await connection.execute(
       Sql.named('''
         select o.worker_id
         from public.service_requests sr
@@ -668,6 +717,7 @@ class RequestsRepository {
     if (insertResult.affectedRows == 0) {
       throw const RequestActionException('Request is not available for review');
     }
+    });
   }
 
   Future<List<Map<String, Object?>>> listRequestImages(
@@ -704,9 +754,9 @@ class RequestsRepository {
     }
 
     final storage = _requireStorage();
-    final connection = await _database.connect();
 
-    final ownershipResult = await connection.execute(
+    return _withDb((connection) async {
+      final ownershipResult = await connection.execute(
       Sql.named('''
         select 1
         from public.service_requests sr
@@ -807,7 +857,8 @@ class RequestsRepository {
       });
     }
 
-    return uploads;
+      return uploads;
+    });
   }
 
   SupabaseStorageClient _requireStorage() {
@@ -830,11 +881,11 @@ class RequestsRepository {
   Future<List<Map<String, Object?>>> _loadAccessibleRequestImages(
     String userId,
     String requestId,
-  ) async {
-    final connection = await _database.connect();
-    final result = await connection.execute(
-      Sql.named('''
-        select ri.id, ri.storage_path, ri.sort_order
+  ) {
+    return _withReadDb((connection) async {
+      final result = await connection.execute(
+        Sql.named('''
+          select ri.id, ri.storage_path, ri.sort_order
         from public.request_images ri
         join public.service_requests sr on sr.id = ri.request_id
         where ri.request_id = @requestId::uuid
@@ -897,6 +948,7 @@ class RequestsRepository {
           },
         )
         .toList(growable: false);
+    });
   }
 
   Future<void> _updateWorkerRequestStatus({
@@ -905,9 +957,9 @@ class RequestsRepository {
     required String expectedStatus,
     required String nextStatus,
     required String errorMessage,
-  }) async {
-    final connection = await _database.connect();
-    final result = await connection.execute(
+  }) {
+    return _withDb((connection) async {
+      final result = await connection.execute(
       Sql.named('''
         update public.service_requests sr
         set status = @nextStatus,
@@ -933,6 +985,7 @@ class RequestsRepository {
     if (result.affectedRows == 0) {
       throw RequestActionException(errorMessage);
     }
+    });
   }
 
   Future<List<Map<String, Object?>>> _loadRequestOffers(
@@ -1036,14 +1089,14 @@ class RequestsRepository {
   Future<List<Map<String, Object?>>> _listWorkerRequests(
     String userId,
     List<String> statuses,
-  ) async {
-    final connection = await _database.connect();
-    final result = await connection.execute(
-      Sql.named('''
-        select
-          sr.id,
-          sr.description,
-          sr.governorate,
+  ) {
+    return _withReadDb((connection) async {
+      final result = await connection.execute(
+        Sql.named('''
+          select
+            sr.id,
+            sr.description,
+            sr.governorate,
           sr.area,
           sr.address,
           sr.preferred_time,
@@ -1087,7 +1140,42 @@ class RequestsRepository {
       },
     );
 
-    return result.map(_mapAcceptedWorkerRequestRow).toList(growable: false);
+      return result.map(_mapAcceptedWorkerRequestRow).toList(growable: false);
+    });
+  }
+
+  Future<List<Map<String, Object?>>?> _readCachedRequestList(String key) async {
+    final cache = _cache;
+    if (cache == null) {
+      return null;
+    }
+
+    final raw = await cache.get(key);
+    final decoded = await decodeCachedJson(raw);
+    if (decoded is! List) {
+      return null;
+    }
+
+    return decoded
+        .whereType<Map>()
+        .map((item) => Map<String, Object?>.from(item))
+        .toList(growable: false);
+  }
+
+  Future<void> _writeCachedRequestList(
+    String key,
+    List<Map<String, Object?>> value,
+  ) async {
+    final cache = _cache;
+    if (cache == null) {
+      return;
+    }
+
+    await cache.set(
+      key: key,
+      value: encodeCachedJson(value),
+      ttl: _workerAvailableCacheTtl,
+    );
   }
 
   Map<String, Object?> _mapCustomerRequestRow(ResultRow row) {

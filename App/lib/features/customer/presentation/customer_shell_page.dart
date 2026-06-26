@@ -26,7 +26,7 @@ class CustomerShellPage extends StatefulWidget {
 }
 
 class _CustomerShellPageState extends State<CustomerShellPage>
-    with AutoRefreshOnResume<CustomerShellPage> {
+    with AutoRefreshOnResume<CustomerShellPage>, PeriodicRefresh<CustomerShellPage> {
   final repository = ServiceRequestsRepository();
   late Future<List<CustomerRequest>> requestsFuture;
   int _selectedIndex = 0;
@@ -42,6 +42,11 @@ class _CustomerShellPageState extends State<CustomerShellPage>
 
   @override
   void onRefresh() {
+    reloadRequests();
+  }
+
+  @override
+  void onPeriodicRefresh() {
     reloadRequests();
   }
 

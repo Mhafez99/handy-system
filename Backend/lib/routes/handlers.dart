@@ -1,3 +1,4 @@
+import 'package:handy_backend/db/database.dart';
 import 'package:handy_backend/middleware/http_middleware.dart';
 import 'package:handy_backend/repositories/catalog_repository.dart';
 import 'package:shelf/shelf.dart';
@@ -31,5 +32,27 @@ Handler buildHealthHandler() {
       'service': 'handy-api',
       'version': '0.1.0',
     });
+  };
+}
+
+Handler buildReadyHandler(Database database) {
+  return (Request request) async {
+    try {
+      final writeReady = await database.pingWritePool();
+      final readReady = await database.pingReadPool();
+      if (!writeReady || !readReady) {
+        return jsonError(503, 'Database is not ready');
+      }
+
+      return jsonOk({
+        'status': 'ready',
+        'database': {
+          'write': writeReady,
+          'read': readReady,
+        },
+      });
+    } catch (_) {
+      return jsonError(503, 'Database is not ready');
+    }
   };
 }

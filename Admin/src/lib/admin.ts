@@ -1,4 +1,10 @@
 import { supabase } from "@/lib/supabase";
+import {
+  buildQuery,
+  getAccessToken,
+  handyApiRequest,
+  isHandyApiConfigured,
+} from "@/lib/handy-api";
 
 export type OverviewDatePreset = "today" | "7d" | "30d" | "all" | "custom";
 
@@ -114,6 +120,18 @@ export function getOverviewDateRange(
 }
 
 export async function loadOverviewStats(dateRange: OverviewDateRange) {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    return handyApiRequest<AdminOverviewStats>(
+      token,
+      "GET",
+      `/v1/admin/overview/stats${buildQuery({
+        from: dateRange.from,
+        to: dateRange.to,
+      })}`,
+    );
+  }
+
   const { data, error } = await supabase.rpc("admin_overview_stats", {
     p_from: dateRange.from,
     p_to: dateRange.to,
@@ -140,6 +158,18 @@ export async function loadOverviewStats(dateRange: OverviewDateRange) {
 }
 
 export async function loadOverviewDailyTrend(dateRange: OverviewDateRange) {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    return handyApiRequest<AdminDailyTrendPoint[]>(
+      token,
+      "GET",
+      `/v1/admin/overview/trend${buildQuery({
+        from: dateRange.from,
+        to: dateRange.to,
+      })}`,
+    );
+  }
+
   const { data, error } = await supabase.rpc("admin_overview_daily_trend", {
     p_from: dateRange.from,
     p_to: dateRange.to,
@@ -153,6 +183,20 @@ export async function loadOverviewDailyTrend(dateRange: OverviewDateRange) {
 }
 
 export async function loadRecentRequests(filters: OverviewFilters) {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    return handyApiRequest<AdminRecentRequest[]>(
+      token,
+      "GET",
+      `/v1/admin/requests/recent${buildQuery({
+        limit: filters.requestLimit ?? 20,
+        from: filters.dateRange.from,
+        to: filters.dateRange.to,
+        status: filters.status,
+      })}`,
+    );
+  }
+
   const { data, error } = await supabase.rpc("admin_list_recent_requests", {
     p_limit: filters.requestLimit ?? 20,
     p_from: filters.dateRange.from,
@@ -181,6 +225,15 @@ export type PendingWorker = {
 };
 
 export async function loadPendingWorkers() {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    return handyApiRequest<PendingWorker[]>(
+      token,
+      "GET",
+      "/v1/admin/workers/pending",
+    );
+  }
+
   const { data, error } = await supabase.rpc("admin_list_pending_workers");
 
   if (error) {
@@ -191,6 +244,12 @@ export async function loadPendingWorkers() {
 }
 
 export async function approveWorker(workerId: string) {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    await handyApiRequest(token, "POST", `/v1/admin/workers/${workerId}/approve`);
+    return;
+  }
+
   const { error } = await supabase.rpc("admin_approve_worker", {
     p_worker_id: workerId,
   });
@@ -201,6 +260,12 @@ export async function approveWorker(workerId: string) {
 }
 
 export async function rejectWorker(workerId: string) {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    await handyApiRequest(token, "POST", `/v1/admin/workers/${workerId}/reject`);
+    return;
+  }
+
   const { error } = await supabase.rpc("admin_reject_worker", {
     p_worker_id: workerId,
   });
@@ -274,6 +339,11 @@ export function getComplaintStatusLabel(status: string) {
 }
 
 export async function loadComplaints() {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    return handyApiRequest<AdminComplaint[]>(token, "GET", "/v1/admin/complaints");
+  }
+
   const { data, error } = await supabase.rpc("admin_list_complaints");
 
   if (error) {
@@ -287,6 +357,14 @@ export async function updateComplaintStatus(
   complaintId: string,
   status: ComplaintStatus,
 ) {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    await handyApiRequest(token, "PATCH", `/v1/admin/complaints/${complaintId}`, {
+      status,
+    });
+    return;
+  }
+
   const { error } = await supabase.rpc("admin_update_complaint_status", {
     p_complaint_id: complaintId,
     p_status: status,
@@ -297,7 +375,90 @@ export async function updateComplaintStatus(
   }
 }
 
+export type AdminReview = {
+  id: string;
+  request_id: string;
+  worker_id: string;
+  worker_name: string;
+  worker_phone: string;
+  customer_id: string;
+  customer_name: string;
+  customer_phone: string;
+  rating: number;
+  comment: string;
+  is_hidden: boolean;
+  created_at: string;
+  service_name: string;
+  area: string;
+};
+
+export type ReviewFilters = {
+  workerId?: string | null;
+  minRating?: number | null;
+  maxRating?: number | null;
+  includeHidden?: boolean;
+  limit?: number;
+};
+
+export async function loadReviews(filters: ReviewFilters = {}) {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    return handyApiRequest<AdminReview[]>(
+      token,
+      "GET",
+      `/v1/admin/reviews${buildQuery({
+        worker_id: filters.workerId,
+        min_rating: filters.minRating,
+        max_rating: filters.maxRating,
+        include_hidden: filters.includeHidden ?? true,
+        limit: filters.limit ?? 50,
+      })}`,
+    );
+  }
+
+  const { data, error } = await supabase.rpc("admin_list_reviews", {
+    p_worker_id: filters.workerId ?? null,
+    p_min_rating: filters.minRating ?? null,
+    p_max_rating: filters.maxRating ?? null,
+    p_include_hidden: filters.includeHidden ?? true,
+    p_limit: filters.limit ?? 50,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []) as AdminReview[];
+}
+
+export async function updateReviewVisibility(
+  reviewId: string,
+  isHidden: boolean,
+) {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    await handyApiRequest(token, "PATCH", `/v1/admin/reviews/${reviewId}`, {
+      is_hidden: isHidden,
+    });
+    return;
+  }
+
+  const { error } = await supabase.rpc("admin_update_review_visibility", {
+    p_review_id: reviewId,
+    p_is_hidden: isHidden,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
 export async function loadAreas() {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    return handyApiRequest<AdminArea[]>(token, "GET", "/v1/admin/areas");
+  }
+
   const { data, error } = await supabase.rpc("admin_list_areas");
 
   if (error) {
@@ -308,6 +469,16 @@ export async function loadAreas() {
 }
 
 export async function createArea(input: CreateAreaInput) {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    await handyApiRequest(token, "POST", "/v1/admin/areas", {
+      governorate: input.governorate.trim(),
+      name: input.name.trim(),
+      sort_order: input.sortOrder,
+    });
+    return;
+  }
+
   const { error } = await supabase.rpc("admin_create_area", {
     p_governorate: input.governorate.trim(),
     p_name: input.name.trim(),
@@ -320,6 +491,17 @@ export async function createArea(input: CreateAreaInput) {
 }
 
 export async function updateArea(input: UpdateAreaInput) {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    await handyApiRequest(token, "PATCH", `/v1/admin/areas/${input.areaId}`, {
+      governorate: input.governorate.trim(),
+      name: input.name.trim(),
+      sort_order: input.sortOrder,
+      is_active: input.isActive,
+    });
+    return;
+  }
+
   const { error } = await supabase.rpc("admin_update_area", {
     p_area_id: input.areaId,
     p_governorate: input.governorate.trim(),
@@ -421,6 +603,18 @@ export async function loadUsers(filters: {
   role: UserRoleFilter;
   status: UserStatusFilter;
 }) {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    return handyApiRequest<AdminUser[]>(
+      token,
+      "GET",
+      `/v1/admin/users${buildQuery({
+        role: filters.role,
+        status: filters.status,
+      })}`,
+    );
+  }
+
   const { data, error } = await supabase.rpc("admin_list_users", {
     p_role: filters.role,
     p_status: filters.status,
@@ -437,6 +631,14 @@ export async function updateUserStatus(
   userId: string,
   status: "active" | "suspended",
 ) {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    await handyApiRequest(token, "PATCH", `/v1/admin/users/${userId}/status`, {
+      status,
+    });
+    return;
+  }
+
   const { error } = await supabase.rpc("admin_update_user_status", {
     p_user_id: userId,
     p_status: status,
@@ -448,6 +650,11 @@ export async function updateUserStatus(
 }
 
 export async function loadCategories() {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    return handyApiRequest<AdminCategory[]>(token, "GET", "/v1/admin/categories");
+  }
+
   const { data, error } = await supabase.rpc("admin_list_categories");
 
   if (error) {
@@ -458,6 +665,15 @@ export async function loadCategories() {
 }
 
 export async function createCategory(input: CreateCategoryInput) {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    await handyApiRequest(token, "POST", "/v1/admin/categories", {
+      name: input.name.trim(),
+      sort_order: input.sortOrder,
+    });
+    return;
+  }
+
   const { error } = await supabase.rpc("admin_create_category", {
     p_name: input.name.trim(),
     p_sort_order: input.sortOrder,
@@ -469,6 +685,16 @@ export async function createCategory(input: CreateCategoryInput) {
 }
 
 export async function updateCategory(input: UpdateCategoryInput) {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    await handyApiRequest(token, "PATCH", `/v1/admin/categories/${input.categoryId}`, {
+      name: input.name.trim(),
+      sort_order: input.sortOrder,
+      is_active: input.isActive,
+    });
+    return;
+  }
+
   const { error } = await supabase.rpc("admin_update_category", {
     p_category_id: input.categoryId,
     p_name: input.name.trim(),
@@ -482,6 +708,15 @@ export async function updateCategory(input: UpdateCategoryInput) {
 }
 
 export async function loadServices(categoryId: number | null = null) {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    return handyApiRequest<AdminService[]>(
+      token,
+      "GET",
+      `/v1/admin/services${buildQuery({ category_id: categoryId })}`,
+    );
+  }
+
   const { data, error } = await supabase.rpc("admin_list_services", {
     p_category_id: categoryId,
   });
@@ -494,6 +729,17 @@ export async function loadServices(categoryId: number | null = null) {
 }
 
 export async function createService(input: CreateServiceInput) {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    await handyApiRequest(token, "POST", "/v1/admin/services", {
+      category_id: input.categoryId,
+      name: input.name.trim(),
+      min_price: input.minPrice,
+      max_price: input.maxPrice,
+    });
+    return;
+  }
+
   const { error } = await supabase.rpc("admin_create_service", {
     p_category_id: input.categoryId,
     p_name: input.name.trim(),
@@ -507,6 +753,18 @@ export async function createService(input: CreateServiceInput) {
 }
 
 export async function updateService(input: UpdateServiceInput) {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    await handyApiRequest(token, "PATCH", `/v1/admin/services/${input.serviceId}`, {
+      category_id: input.categoryId,
+      name: input.name.trim(),
+      min_price: input.minPrice,
+      max_price: input.maxPrice,
+      is_active: input.isActive,
+    });
+    return;
+  }
+
   const { error } = await supabase.rpc("admin_update_service", {
     p_service_id: input.serviceId,
     p_category_id: input.categoryId,
