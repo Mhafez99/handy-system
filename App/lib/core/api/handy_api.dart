@@ -1,6 +1,7 @@
 import 'package:handy_app/core/api/api_client.dart';
 import 'package:handy_app/core/api/catalog_api.dart';
 import 'package:handy_app/core/api/devices_api.dart';
+import 'package:handy_app/core/api/profile_api.dart';
 import 'package:handy_app/core/api/requests_api.dart';
 import 'package:handy_app/core/api/workers_api.dart';
 import 'package:handy_app/core/config/backend_config.dart';
@@ -30,6 +31,8 @@ class HandyApi {
   RequestsApi get requests => RequestsApi(client: _client);
 
   WorkersApi get workers => WorkersApi(client: _client);
+
+  ProfileApi get profile => ProfileApi(client: _client);
 
   DevicesApi get devices => DevicesApi(client: _client);
 }

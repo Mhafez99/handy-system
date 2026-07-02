@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:handy_app/core/widgets/app_ui.dart';
 import 'package:handy_app/features/requests/domain/accepted_worker_request.dart';
 import 'package:handy_app/features/requests/presentation/payment_summary_widgets.dart';
 import 'package:handy_app/features/worker/domain/worker_history_filter.dart';
@@ -152,9 +153,11 @@ class CompletedWorkHistoryCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                Chip(
-                  label: Text(workerHistoryStatusLabel(request.status)),
-                  visualDensity: VisualDensity.compact,
+                AppBadge(
+                  label: workerHistoryStatusLabel(request.status),
+                  variant: request.status == 'complaint'
+                      ? AppBadgeVariant.destructive
+                      : AppBadgeVariant.success,
                 ),
               ],
             ),
@@ -245,34 +248,12 @@ class WorkerHistoryEmptyCard extends StatelessWidget {
         'كل أعمالك المكتملة حصلت على تقييم.',
     };
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Icon(
-              Icons.history_rounded,
-              size: 48,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              filter == WorkerHistoryFilter.all
-                  ? 'لا توجد أعمال مكتملة بعد.'
-                  : 'مفيش نتائج في "${filter.label}".',
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return AppEmptyState(
+      icon: Icons.history_rounded,
+      title: filter == WorkerHistoryFilter.all
+          ? 'لا توجد أعمال مكتملة بعد.'
+          : 'مفيش نتائج في "${filter.label}".',
+      message: message,
     );
   }
 }

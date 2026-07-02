@@ -1,8 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  getOverviewDateRange,
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
+  Activity,
+  CheckCircle2,
+  ClipboardList,
+  MessageSquareWarning,
+  Users,
+} from "lucide-react";
+import {
   getRequestStatusLabel,
   loadOverviewDailyTrend,
   loadOverviewStats,
@@ -10,8 +27,27 @@ import {
   type AdminDailyTrendPoint,
   type AdminOverviewStats,
   type AdminRecentRequest,
-  type OverviewDatePreset,
+  type OverviewDateRange,
 } from "@/lib/admin";
+import { DateRangeFilter } from "@/components/date-range-filter";
+import { StatCard } from "@/components/stat-card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { formatCurrency, formatNumber } from "@/lib/utils";
 
 type OverviewPanelProps = {
   refreshToken: number;
@@ -29,33 +65,64 @@ const trackedStatuses = [
   "complaint",
 ] as const;
 
-const datePresets: Array<{ id: OverviewDatePreset; label: string }> = [
-  { id: "today", label: "اليوم" },
-  { id: "7d", label: "7 أيام" },
-  { id: "30d", label: "30 يوم" },
-  { id: "all", label: "الكل" },
-  { id: "custom", label: "مخصص" },
-];
-
-export function OverviewPanel({
-  refreshToken,
-  onError,
-}: OverviewPanelProps) {
+export function OverviewPanel({ refreshToken, onError }: OverviewPanelProps) {
+  const [range, setRange] = useState<OverviewDateRange>({
+    from: null,
+    to: null,
+  });
   const [stats, setStats] = useState<AdminOverviewStats | null>(null);
   const [trend, setTrend] = useState<AdminDailyTrendPoint[]>([]);
   const [requests, setRequests] = useState<AdminRecentRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [datePreset, setDatePreset] = useState<OverviewDatePreset>("30d");
-  const [customFrom, setCustomFrom] = useState("");
-  const [customTo, setCustomTo] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
-  const dateRange = useMemo(
-    () => getOverviewDateRange(datePreset, customFrom, customTo),
-    [customFrom, customTo, datePreset],
+  const handleRangeChange = useCallback((next: OverviewDateRange) => {
+    setRange(next);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoading(true);
+    onError("");
+
+    Promise.all([
+      loadOverviewStats(range),
+      loadOverviewDailyTrend(range),
+      loadRecentRequests({
+        dateRange: range,
+        status: statusFilter === "all" ? null : statusFilter,
+      }),
+    ])
+      .then(([nextStats, nextTrend, nextRequests]) => {
+        if (cancelled) return;
+        setStats(nextStats);
+        setTrend(nextTrend);
+        setRequests(nextRequests);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          onError(error instanceof Error ? error.message : "حدث خطأ غير متوقع.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [range, statusFilter, refreshToken, onError]);
+
+  const trendChart = useMemo(
+    () =>
+      trend.map((point) => ({
+        ...point,
+        label: formatShortDay(point.day),
+      })),
+    [trend],
   );
 
-  const statusCards = useMemo(() => {
+  const statusChart = useMemo(() => {
     const counts = stats?.status_counts ?? {};
     return trackedStatuses.map((status) => ({
       status,
@@ -64,318 +131,305 @@ export function OverviewPanel({
     }));
   }, [stats]);
 
-  const maxStatusCount = useMemo(
-    () => Math.max(...statusCards.map((item) => item.count), 1),
-    [statusCards],
+  const periodLabel = stats?.is_filtered ? "في الفترة" : "الإجمالي";
+
+  return (
+    <div className="flex flex-col gap-5">
+      <Card>
+        <CardHeader>
+          <CardTitle>الفترة الزمنية</CardTitle>
+          <CardDescription>
+            تُطبَّق الفترة على البطاقات والرسم البياني وقائمة الطلبات.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <DateRangeFilter onRangeChange={handleRangeChange} />
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {isLoading || !stats ? (
+          Array.from({ length: 8 }).map((_, index) => (
+            <Skeleton key={index} className="h-28 rounded-xl" />
+          ))
+        ) : (
+          <>
+            <StatCard
+              label={`${periodLabel} الطلبات`}
+              value={formatNumber(stats.total_requests)}
+              icon={<ClipboardList />}
+              accent="primary"
+            />
+            <StatCard
+              label="طلبات نشطة"
+              value={formatNumber(stats.active_requests)}
+              icon={<Activity />}
+            />
+            <StatCard
+              label="طلبات مكتملة"
+              value={formatNumber(stats.completed_requests)}
+              icon={<CheckCircle2 />}
+              accent="success"
+            />
+            <StatCard
+              label="طلبات اليوم"
+              value={formatNumber(stats.requests_today)}
+              icon={<ClipboardList />}
+            />
+            <StatCard
+              label="شكاوى مفتوحة"
+              value={formatNumber(stats.open_complaints)}
+              icon={<MessageSquareWarning />}
+              accent={stats.open_complaints > 0 ? "destructive" : "default"}
+            />
+            <StatCard
+              label="صنايعية بانتظار الاعتماد"
+              value={formatNumber(stats.pending_workers)}
+              icon={<Users />}
+            />
+            <StatCard
+              label="العملاء"
+              value={formatNumber(stats.total_customers)}
+              icon={<Users />}
+            />
+            <StatCard
+              label="صنايعية نشطة"
+              value={formatNumber(stats.active_workers)}
+              icon={<Users />}
+              accent="success"
+            />
+          </>
+        )}
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-5">
+        <Card className="lg:col-span-3">
+          <CardHeader>
+            <CardTitle>اتجاه الطلبات اليومي</CardTitle>
+            <CardDescription>إجمالي الطلبات مقابل المكتملة.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-72 w-full" />
+            ) : trendChart.length === 0 ? (
+              <EmptyState />
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={trendChart} margin={{ right: 8, left: 8, top: 8 }}>
+                  <defs>
+                    <linearGradient id="totalFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="doneFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--chart-3)" stopOpacity={0.5} />
+                      <stop offset="95%" stopColor="var(--chart-3)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                    reversed
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                    width={36}
+                    orientation="right"
+                  />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Area
+                    type="monotone"
+                    dataKey="total"
+                    name="إجمالي"
+                    stroke="var(--chart-1)"
+                    fill="url(#totalFill)"
+                    strokeWidth={2}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="completed"
+                    name="مكتمل"
+                    stroke="var(--chart-3)"
+                    fill="url(#doneFill)"
+                    strokeWidth={2}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>توزيع الحالات</CardTitle>
+            <CardDescription>عدد الطلبات لكل حالة.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-72 w-full" />
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart
+                  data={statusChart}
+                  layout="vertical"
+                  margin={{ left: 8, right: 8 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="var(--border)"
+                    horizontal={false}
+                  />
+                  <XAxis
+                    type="number"
+                    allowDecimals={false}
+                    tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="label"
+                    width={70}
+                    tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                  />
+                  <Tooltip content={<ChartTooltip />} cursor={{ fill: "var(--muted)" }} />
+                  <Bar
+                    dataKey="count"
+                    name="الطلبات"
+                    fill="var(--chart-1)"
+                    radius={[0, 6, 6, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader className="flex-row items-center justify-between gap-4 space-y-0">
+          <div>
+            <CardTitle>أحدث الطلبات</CardTitle>
+            <CardDescription>آخر الطلبات مع حالتها.</CardDescription>
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="كل الحالات" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">كل الحالات</SelectItem>
+              {trackedStatuses.map((status) => (
+                <SelectItem key={status} value={status}>
+                  {getRequestStatusLabel(status)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <Skeleton className="h-48 w-full" />
+          ) : requests.length === 0 ? (
+            <EmptyState />
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2">
+              {requests.map((request) => (
+                <div
+                  key={request.id}
+                  className="rounded-xl border border-border p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-bold">{request.service_name}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {request.category_name} • {request.governorate}،{" "}
+                        {request.area}
+                      </p>
+                    </div>
+                    <Badge variant={statusVariant(request.status)}>
+                      {getRequestStatusLabel(request.status)}
+                    </Badge>
+                  </div>
+                  <div className="mt-3 grid gap-1 text-xs text-muted-foreground">
+                    <p>
+                      العميل:{" "}
+                      <span className="text-foreground">
+                        {request.customer_name}
+                      </span>
+                    </p>
+                    <p>
+                      الصنايعي:{" "}
+                      <span className="text-foreground">
+                        {request.worker_name || "لم يُقبل عرض بعد"}
+                      </span>
+                    </p>
+                    <p>العروض: {formatNumber(request.offer_count)}</p>
+                    {request.final_price != null ? (
+                      <p>
+                        السعر النهائي:{" "}
+                        <span className="font-semibold text-foreground">
+                          {formatCurrency(request.final_price)}
+                        </span>
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
+}
 
-  const maxTrendTotal = useMemo(
-    () => Math.max(...trend.map((point) => point.total), 1),
-    [trend],
-  );
-
-  const trendSummary = useMemo(() => {
-    const total = trend.reduce((sum, point) => sum + point.total, 0);
-    const completed = trend.reduce((sum, point) => sum + point.completed, 0);
-    return { total, completed };
-  }, [trend]);
-
-  const periodLabel = stats?.is_filtered ? "في الفترة" : "إجمالي";
-
-  useEffect(() => {
-    let cancelled = false;
-
-    setIsLoading(true);
-    onError("");
-
-    const filters = {
-      dateRange,
-      status: statusFilter || null,
-    };
-
-    Promise.all([
-      loadOverviewStats(dateRange),
-      loadOverviewDailyTrend(dateRange),
-      loadRecentRequests(filters),
-    ])
-      .then(([nextStats, nextTrend, nextRequests]) => {
-        if (!cancelled) {
-          setStats(nextStats);
-          setTrend(nextTrend);
-          setRequests(nextRequests);
-        }
-      })
-      .catch((caughtError) => {
-        if (!cancelled) {
-          onError(getErrorMessage(caughtError));
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [dateRange, onError, refreshToken, statusFilter]);
-
-  if (isLoading) {
-    return (
-      <section className="panel">
-        <p className="muted">جاري تحميل لوحة المتابعة...</p>
-      </section>
-    );
+function statusVariant(status: string) {
+  switch (status) {
+    case "completed":
+      return "success" as const;
+    case "cancelled":
+    case "complaint":
+      return "destructive" as const;
+    case "new":
+    case "offered":
+      return "secondary" as const;
+    default:
+      return "default" as const;
   }
+}
 
-  if (!stats) {
-    return (
-      <section className="panel empty">
-        <h2>تعذر تحميل الإحصائيات</h2>
-        <p className="muted">حاول التحديث مرة أخرى.</p>
-      </section>
-    );
+function ChartTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; color: string }>;
+  label?: string;
+}) {
+  if (!active || !payload || payload.length === 0) {
+    return null;
   }
 
   return (
-    <>
-      <section className="panel overview-filters">
-        <div className="overview-filters-header">
-          <div>
-            <h2>الفترة الزمنية</h2>
-            <p className="muted">
-              {stats.is_filtered
-                ? "الإحصائيات والطلبات والرسم البياني محدّدة بالفترة المختارة."
-                : "عرض شامل لكل الطلبات. الرسم البياني يعرض آخر 30 يومًا."}
-            </p>
-          </div>
-        </div>
+    <div className="rounded-lg border border-border bg-popover p-3 text-xs shadow-md">
+      {label ? <p className="mb-1 font-bold">{label}</p> : null}
+      {payload.map((item) => (
+        <p key={item.name} className="flex items-center gap-2">
+          <i className="size-2.5 rounded-full" style={{ background: item.color }} />
+          <span className="text-muted-foreground">{item.name}:</span>
+          <span className="font-semibold">{formatNumber(item.value)}</span>
+        </p>
+      ))}
+    </div>
+  );
+}
 
-        <div className="filter-chip-row">
-          {datePresets.map((preset) => (
-            <button
-              className={
-                datePreset === preset.id ? "filter-chip active" : "filter-chip"
-              }
-              key={preset.id}
-              onClick={() => setDatePreset(preset.id)}
-              type="button"
-            >
-              {preset.label}
-            </button>
-          ))}
-        </div>
-
-        {datePreset === "custom" ? (
-          <div className="date-range-inputs">
-            <label>
-              من
-              <input
-                onChange={(event) => setCustomFrom(event.target.value)}
-                type="date"
-                value={customFrom}
-              />
-            </label>
-            <label>
-              إلى
-              <input
-                onChange={(event) => setCustomTo(event.target.value)}
-                type="date"
-                value={customTo}
-              />
-            </label>
-          </div>
-        ) : null}
-      </section>
-
-      <section className="stats-grid overview-stats-grid">
-        <article className="stat-card">
-          <span>{periodLabel} الطلبات</span>
-          <strong>{stats.total_requests}</strong>
-        </article>
-        <article className="stat-card">
-          <span>طلبات نشطة {stats.is_filtered ? "في الفترة" : ""}</span>
-          <strong>{stats.active_requests}</strong>
-        </article>
-        <article className="stat-card">
-          <span>طلبات مكتملة {stats.is_filtered ? "في الفترة" : ""}</span>
-          <strong>{stats.completed_requests}</strong>
-        </article>
-        <article className="stat-card">
-          <span>طلبات اليوم</span>
-          <strong>{stats.requests_today}</strong>
-        </article>
-        <article className="stat-card">
-          <span>شكاوى مفتوحة</span>
-          <strong>{stats.open_complaints}</strong>
-        </article>
-        <article className="stat-card">
-          <span>صنايعية بانتظار الاعتماد</span>
-          <strong>{stats.pending_workers}</strong>
-        </article>
-        <article className="stat-card">
-          <span>العملاء</span>
-          <strong>{stats.total_customers}</strong>
-        </article>
-        <article className="stat-card">
-          <span>صنايعية نشطة</span>
-          <strong>{stats.active_workers}</strong>
-        </article>
-        <article className="stat-card">
-          <span>
-            {stats.is_filtered ? "عروض في الفترة" : "إجمالي العروض"}
-          </span>
-          <strong>
-            {stats.is_filtered ? stats.offers_in_period : stats.total_offers}
-          </strong>
-        </article>
-      </section>
-
-      <section className="panel panel-spacer">
-        <div className="chart-panel-header">
-          <div>
-            <h2>اتجاه الطلبات اليومي</h2>
-            <p className="muted">
-              {trendSummary.total} طلب • {trendSummary.completed} مكتمل
-            </p>
-          </div>
-        </div>
-
-        {trend.length === 0 ? (
-          <p className="muted">لا توجد بيانات للفترة المحددة.</p>
-        ) : (
-          <div className="trend-chart" role="img" aria-label="رسم بياني يومي للطلبات">
-            {trend.map((point) => {
-              const totalHeight = Math.max(
-                (point.total / maxTrendTotal) * 100,
-                point.total > 0 ? 8 : 0,
-              );
-              const completedHeight =
-                point.total > 0
-                  ? (point.completed / point.total) * totalHeight
-                  : 0;
-
-              return (
-                <div className="trend-chart-column" key={point.day}>
-                  <div className="trend-chart-bars">
-                    <div
-                      className="trend-chart-bar total"
-                      style={{ height: `${totalHeight}%` }}
-                      title={`${point.total} طلب`}
-                    >
-                      <div
-                        className="trend-chart-bar completed"
-                        style={{ height: `${completedHeight}%` }}
-                      />
-                    </div>
-                  </div>
-                  <span className="trend-chart-label">
-                    {formatShortDay(point.day)}
-                  </span>
-                  <span className="trend-chart-value">{point.total}</span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        <div className="chart-legend">
-          <span>
-            <i className="legend-swatch total" /> إجمالي الطلبات
-          </span>
-          <span>
-            <i className="legend-swatch completed" /> مكتملة
-          </span>
-        </div>
-      </section>
-
-      <section className="panel panel-spacer">
-        <h2>توزيع الطلبات حسب الحالة</h2>
-        <div className="status-bar-chart">
-          {statusCards.map((item) => (
-            <div className="status-bar-row" key={item.status}>
-              <span className="status-bar-label">{item.label}</span>
-              <div className="status-bar-track">
-                <div
-                  className="status-bar-fill"
-                  style={{
-                    width: `${(item.count / maxStatusCount) * 100}%`,
-                  }}
-                />
-              </div>
-              <strong className="status-bar-count">{item.count}</strong>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="panel panel-spacer">
-        <div className="overview-list-header">
-          <h2>أحدث الطلبات</h2>
-          <label className="overview-status-filter">
-            الحالة
-            <select
-              onChange={(event) => setStatusFilter(event.target.value)}
-              value={statusFilter}
-            >
-              <option value="">الكل</option>
-              {trackedStatuses.map((status) => (
-                <option key={status} value={status}>
-                  {getRequestStatusLabel(status)}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        {requests.length === 0 ? (
-          <p className="muted">لا توجد طلبات مطابقة للفلاتر الحالية.</p>
-        ) : (
-          <div className="workers-list overview-requests-list">
-            {requests.map((request) => (
-              <article className="worker-card" key={request.id}>
-                <div className="worker-header">
-                  <div>
-                    <h3>{request.service_name}</h3>
-                    <p className="muted">
-                      {request.category_name} • {request.governorate}،{" "}
-                      {request.area}
-                    </p>
-                  </div>
-                  <span className="badge">
-                    {getRequestStatusLabel(request.status)}
-                  </span>
-                </div>
-
-                <div className="worker-details">
-                  <p>
-                    <strong>العميل:</strong> {request.customer_name}
-                  </p>
-                  <p>
-                    <strong>الصنايعي:</strong>{" "}
-                    {request.worker_name || "لم يُقبل عرض بعد"}
-                  </p>
-                  <p>
-                    <strong>العروض:</strong> {request.offer_count}
-                  </p>
-                  {request.final_price != null ? (
-                    <p>
-                      <strong>السعر النهائي:</strong> {request.final_price} جنيه
-                      {request.payment_method === "cash" ? " (كاش)" : ""}
-                    </p>
-                  ) : null}
-                  <p>
-                    <strong>تاريخ الإنشاء:</strong>{" "}
-                    {new Date(request.created_at).toLocaleString("ar-EG")}
-                  </p>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
-    </>
+function EmptyState() {
+  return (
+    <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
+      لا توجد بيانات للفترة المحددة.
+    </div>
   );
 }
 
@@ -384,8 +438,4 @@ function formatShortDay(day: string) {
     day: "numeric",
     month: "short",
   });
-}
-
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "حدث خطأ غير متوقع.";
 }

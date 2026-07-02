@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:handy_app/core/widgets/app_ui.dart';
 import 'package:handy_app/features/offers/presentation/send_offer_page.dart';
 import 'package:handy_app/features/requests/data/service_requests_repository.dart';
 import 'package:handy_app/features/requests/domain/accepted_worker_request.dart';
@@ -343,9 +344,11 @@ class AcceptedRequestCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                Chip(
-                  label: Text(requestStatusLabel(request.status)),
-                  visualDensity: VisualDensity.compact,
+                AppBadge(
+                  label: requestStatusLabel(request.status),
+                  variant: request.status == 'completed'
+                      ? AppBadgeVariant.success
+                      : AppBadgeVariant.primary,
                 ),
               ],
             ),
@@ -640,9 +643,9 @@ class AvailableRequestCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                Chip(
-                  label: Text(request.priceRange),
-                  visualDensity: VisualDensity.compact,
+                AppBadge(
+                  label: request.priceRange,
+                  variant: AppBadgeVariant.neutral,
                 ),
               ],
             ),
@@ -676,32 +679,11 @@ class EmptyAcceptedRequestsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Icon(
-              Icons.assignment_turned_in_outlined,
-              size: 44,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'لا توجد طلبات مقبولة حتى الآن.',
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'عندما يقبل العميل عرضك ستظهر بياناته هنا للتواصل وتنفيذ الشغل.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return const AppEmptyState(
+      icon: Icons.assignment_turned_in_outlined,
+      title: 'لا توجد طلبات مقبولة حتى الآن.',
+      message:
+          'عندما يقبل العميل عرضك ستظهر بياناته هنا للتواصل وتنفيذ الشغل.',
     );
   }
 }
@@ -711,32 +693,10 @@ class EmptyWorkerRequestsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Icon(
-              Icons.search_off_rounded,
-              size: 48,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'لا توجد طلبات مناسبة الآن.',
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'ستظهر هنا الطلبات الجديدة في نفس تخصصك ومنطقتك.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return const AppEmptyState(
+      icon: Icons.search_off_rounded,
+      title: 'لا توجد طلبات مناسبة الآن.',
+      message: 'ستظهر هنا الطلبات الجديدة في نفس تخصصك ومنطقتك.',
     );
   }
 }
@@ -749,19 +709,13 @@ class ErrorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Text(message),
-            const SizedBox(height: 8),
-            OutlinedButton(
-              onPressed: onRetry,
-              child: const Text('إعادة المحاولة'),
-            ),
-          ],
-        ),
+    return AppEmptyState(
+      icon: Icons.wifi_off_rounded,
+      title: message,
+      action: OutlinedButton.icon(
+        onPressed: onRetry,
+        icon: const Icon(Icons.refresh_rounded),
+        label: const Text('إعادة المحاولة'),
       ),
     );
   }

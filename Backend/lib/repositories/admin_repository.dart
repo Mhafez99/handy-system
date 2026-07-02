@@ -1231,4 +1231,284 @@ class AdminRepository implements AdminOperations {
 
     return value?.toString();
   }
+
+  @override
+  Future<Map<String, Object?>> getSettings() {
+    return _database.withReadConnection((connection) async {
+      final settingsResult = await connection.execute(
+        Sql.named('''
+          select
+            default_commission_rate::float8,
+            min_order_price,
+            updated_at
+          from public.platform_settings
+          where id = 1
+        '''),
+      );
+
+      final categoriesResult = await connection.execute(
+        Sql.named('''
+          select id, name, commission_rate::float8
+          from public.categories
+          order by sort_order, name
+        '''),
+      );
+
+      final categories = categoriesResult
+          .map(
+            (row) => {
+              'id': row[0],
+              'name': row[1],
+              'commission_rate': row[2],
+            },
+          )
+          .toList(growable: false);
+
+      if (settingsResult.isEmpty) {
+        return {
+          'default_commission_rate': 0.10,
+          'min_order_price': 0,
+          'updated_at': null,
+          'categories': categories,
+        };
+      }
+
+      final row = settingsResult.first;
+      return {
+        'default_commission_rate': row[0],
+        'min_order_price': row[1],
+        'updated_at': _formatTimestamp(row[2]),
+        'categories': categories,
+      };
+    });
+  }
+
+  @override
+  Future<void> updateSettings({
+    required double defaultCommissionRate,
+    required int minOrderPrice,
+  }) {
+    if (defaultCommissionRate < 0 || defaultCommissionRate > 1) {
+      throw const RequestActionException(
+        'Commission rate must be between 0 and 1',
+      );
+    }
+
+    return _database.withConnection((connection) async {
+      await connection.execute(
+        Sql.named('''
+          update public.platform_settings
+          set default_commission_rate = @rate,
+              min_order_price = @minOrderPrice,
+              updated_at = now()
+          where id = 1
+        '''),
+        parameters: {
+          'rate': defaultCommissionRate,
+          'minOrderPrice': minOrderPrice < 0 ? 0 : minOrderPrice,
+        },
+      );
+      await _invalidateOverviewCache();
+    });
+  }
+
+  @override
+  Future<void> updateCategoryCommission({
+    required int categoryId,
+    double? commissionRate,
+  }) {
+    if (commissionRate != null &&
+        (commissionRate < 0 || commissionRate > 1)) {
+      throw const RequestActionException(
+        'Commission rate must be between 0 and 1',
+      );
+    }
+
+    return _database.withConnection((connection) async {
+      final result = await connection.execute(
+        Sql.named('''
+          update public.categories
+          set commission_rate = @rate
+          where id = @categoryId
+        '''),
+        parameters: {
+          'categoryId': categoryId,
+          'rate': commissionRate,
+        },
+      );
+
+      if (result.affectedRows == 0) {
+        throw const RequestActionException('Category was not found');
+      }
+      await _invalidateOverviewCache();
+    });
+  }
+
+  @override
+  Future<Map<String, Object?>> getRevenueStats({
+    DateTime? from,
+    DateTime? to,
+  }) {
+    return _database.withReadConnection((connection) async {
+      final result = await connection.execute(
+        Sql.named('''
+          select
+            count(*)::int as completed_count,
+            coalesce(sum(gross_amount), 0)::bigint as total_gross,
+            coalesce(sum(commission_amount), 0)::bigint as total_commission,
+            coalesce(sum(net_amount), 0)::bigint as total_net,
+            coalesce(round(avg(gross_amount)), 0)::int as avg_order
+          from public.platform_commissions
+          where (@from::timestamptz is null or created_at >= @from)
+            and (@to::timestamptz is null or created_at <= @to)
+        '''),
+        parameters: {'from': from, 'to': to},
+      );
+
+      final row = result.first;
+      return {
+        'completed_count': row[0],
+        'total_gross': row[1],
+        'total_commission': row[2],
+        'total_net': row[3],
+        'avg_order': row[4],
+        'is_filtered': from != null || to != null,
+      };
+    });
+  }
+
+  @override
+  Future<List<Map<String, Object?>>> getRevenueByCategory({
+    DateTime? from,
+    DateTime? to,
+  }) {
+    return _database.withReadConnection((connection) async {
+      final result = await connection.execute(
+        Sql.named('''
+          select
+            pc.category_id,
+            coalesce(c.name, 'غير محدد') as category_name,
+            count(*)::int as completed_count,
+            sum(pc.gross_amount)::bigint as total_gross,
+            sum(pc.commission_amount)::bigint as total_commission,
+            sum(pc.net_amount)::bigint as total_net
+          from public.platform_commissions pc
+          left join public.categories c on c.id = pc.category_id
+          where (@from::timestamptz is null or pc.created_at >= @from)
+            and (@to::timestamptz is null or pc.created_at <= @to)
+          group by pc.category_id, c.name
+          order by total_commission desc
+        '''),
+        parameters: {'from': from, 'to': to},
+      );
+
+      return result
+          .map(
+            (row) => {
+              'category_id': row[0],
+              'category_name': row[1],
+              'completed_count': row[2],
+              'total_gross': row[3],
+              'total_commission': row[4],
+              'total_net': row[5],
+            },
+          )
+          .toList(growable: false);
+    });
+  }
+
+  @override
+  Future<List<Map<String, Object?>>> getRevenueDaily({
+    DateTime? from,
+    DateTime? to,
+  }) {
+    return _database.withReadConnection((connection) async {
+      final result = await connection.execute(
+        Sql.named('''
+          select
+            (pc.created_at at time zone 'utc')::date as day,
+            sum(pc.gross_amount)::bigint as total_gross,
+            sum(pc.commission_amount)::bigint as total_commission,
+            sum(pc.net_amount)::bigint as total_net
+          from public.platform_commissions pc
+          where (@from::timestamptz is null or pc.created_at >= @from)
+            and (@to::timestamptz is null or pc.created_at <= @to)
+          group by day
+          order by day
+        '''),
+        parameters: {'from': from, 'to': to},
+      );
+
+      return result
+          .map(
+            (row) => {
+              'day': _formatDate(row[0]),
+              'total_gross': row[1],
+              'total_commission': row[2],
+              'total_net': row[3],
+            },
+          )
+          .toList(growable: false);
+    });
+  }
+
+  @override
+  Future<List<Map<String, Object?>>> listWorkerPayouts({
+    DateTime? from,
+    DateTime? to,
+    int limit = 50,
+  }) {
+    return _database.withReadConnection((connection) async {
+      final result = await connection.execute(
+        Sql.named('''
+          select
+            pc.worker_id,
+            coalesce(p.full_name, 'غير محدد') as worker_name,
+            coalesce(p.phone, '') as worker_phone,
+            count(*)::int as jobs_count,
+            sum(pc.gross_amount)::bigint as total_gross,
+            sum(pc.commission_amount)::bigint as total_commission,
+            sum(pc.net_amount)::bigint as total_net
+          from public.platform_commissions pc
+          left join public.profiles p on p.id = pc.worker_id
+          where pc.worker_id is not null
+            and (@from::timestamptz is null or pc.created_at >= @from)
+            and (@to::timestamptz is null or pc.created_at <= @to)
+          group by pc.worker_id, p.full_name, p.phone
+          order by total_net desc
+          limit @limit
+        '''),
+        parameters: {
+          'from': from,
+          'to': to,
+          'limit': limit < 1 ? 50 : (limit > 200 ? 200 : limit),
+        },
+      );
+
+      return result
+          .map(
+            (row) => {
+              'worker_id': row[0]?.toString(),
+              'worker_name': row[1],
+              'worker_phone': row[2],
+              'jobs_count': row[3],
+              'total_gross': row[4],
+              'total_commission': row[5],
+              'total_net': row[6],
+            },
+          )
+          .toList(growable: false);
+    });
+  }
+
+  String? _formatDate(Object? value) {
+    if (value is DateTime) {
+      final utc = value.toUtc();
+      final month = utc.month.toString().padLeft(2, '0');
+      final day = utc.day.toString().padLeft(2, '0');
+      return '${utc.year}-$month-$day';
+    }
+
+    return value?.toString();
+  }
 }

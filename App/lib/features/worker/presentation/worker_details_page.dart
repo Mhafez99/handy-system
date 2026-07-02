@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:handy_app/core/widgets/app_ui.dart';
 import 'package:handy_app/features/reviews/domain/service_review.dart';
 import 'package:handy_app/features/worker/data/workers_repository.dart';
 import 'package:handy_app/features/worker/domain/worker_public_details.dart';
@@ -49,11 +50,14 @@ class _WorkerDetailsPageState extends State<WorkerDetailsPage> {
               return ListView(
                 padding: const EdgeInsets.all(24),
                 children: [
-                  const Text('تعذر تحميل بيانات الصنايعي.'),
-                  const SizedBox(height: 12),
-                  OutlinedButton(
-                    onPressed: reloadDetails,
-                    child: const Text('إعادة المحاولة'),
+                  AppEmptyState(
+                    icon: Icons.person_off_outlined,
+                    title: 'تعذر تحميل بيانات الصنايعي.',
+                    action: OutlinedButton.icon(
+                      onPressed: reloadDetails,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('إعادة المحاولة'),
+                    ),
                   ),
                 ],
               );
@@ -67,12 +71,7 @@ class _WorkerDetailsPageState extends State<WorkerDetailsPage> {
                 const SizedBox(height: 16),
                 WorkerBioCard(details: details),
                 const SizedBox(height: 24),
-                Text(
-                  'آخر التقييمات',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-                ),
+                const AppSectionHeader(title: 'آخر التقييمات'),
                 const SizedBox(height: 12),
                 if (details.reviews.isEmpty)
                   const EmptyWorkerReviewsCard()
@@ -218,24 +217,9 @@ class EmptyWorkerReviewsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Icon(
-              Icons.rate_review_outlined,
-              size: 44,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'لا توجد تقييمات لهذا الصنايعي بعد.',
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
+    return const AppEmptyState(
+      icon: Icons.rate_review_outlined,
+      title: 'لا توجد تقييمات لهذا الصنايعي بعد.',
     );
   }
 }

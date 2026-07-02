@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:handy_app/core/widgets/app_ui.dart';
 
 String paymentMethodLabel(String? paymentMethod) {
   return switch (paymentMethod) {
@@ -282,11 +283,10 @@ class _CashChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Chip(
-      label: Text(label),
-      avatar: const Icon(Icons.payments_outlined, size: 16),
-      visualDensity: VisualDensity.compact,
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    return AppBadge(
+      label: label,
+      variant: AppBadgeVariant.success,
+      icon: Icons.payments_outlined,
     );
   }
 }

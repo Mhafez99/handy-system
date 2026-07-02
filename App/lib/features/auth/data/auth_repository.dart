@@ -1,15 +1,27 @@
+import 'package:handy_app/core/api/handy_api.dart';
+import 'package:handy_app/core/api/profile_api.dart';
+import 'package:handy_app/core/config/backend_config.dart';
 import 'package:handy_app/core/push/push_notification_service.dart';
 import 'package:handy_app/features/auth/domain/registration_data.dart';
 import 'package:handy_app/features/auth/domain/update_profile_data.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthRepository {
-  AuthRepository({SupabaseClient? client}) : _clientOverride = client;
+  AuthRepository({SupabaseClient? client, HandyApi? handyApi, ProfileApi? profileApi})
+    : _clientOverride = client,
+      _handyApi = handyApi,
+      _profileApi = profileApi;
 
   final SupabaseClient? _clientOverride;
+  final HandyApi? _handyApi;
+  final ProfileApi? _profileApi;
 
   SupabaseClient get _client {
     return _clientOverride ?? Supabase.instance.client;
+  }
+
+  ProfileApi get _profile {
+    return _profileApi ?? (_handyApi ?? HandyApi()).profile;
   }
 
   Future<bool> signUp(RegistrationData data) async {
@@ -38,6 +50,10 @@ class AuthRepository {
   }
 
   Future<Map<String, dynamic>> loadCurrentProfile() async {
+    if (BackendConfig.isApiConfigured) {
+      return _profile.loadProfile();
+    }
+
     final user = _client.auth.currentUser;
     if (user == null) {
       throw const AuthException('لا توجد جلسة مستخدم نشطة.');
@@ -47,6 +63,12 @@ class AuthRepository {
   }
 
   Future<Map<String, dynamic>?> loadWorkerProfile() async {
+    if (BackendConfig.isApiConfigured) {
+      final profile = await _profile.loadProfile();
+      final worker = profile['worker'];
+      return worker is Map ? Map<String, dynamic>.from(worker) : null;
+    }
+
     final user = _client.auth.currentUser;
     if (user == null) {
       throw const AuthException('لا توجد جلسة مستخدم نشطة.');
@@ -64,6 +86,11 @@ class AuthRepository {
   String? get currentUserEmail => _client.auth.currentUser?.email;
 
   Future<void> updateProfile(UpdateProfileData data) async {
+    if (BackendConfig.isApiConfigured) {
+      await _profile.updateProfile(data);
+      return;
+    }
+
     final user = _client.auth.currentUser;
     if (user == null) {
       throw const AuthException('لا توجد جلسة مستخدم نشطة.');
@@ -78,7 +105,6 @@ class AuthRepository {
           'area': data.area.trim(),
           'area_id': data.areaId,
           'address': data.address.trim(),
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', user.id);
 

@@ -121,6 +121,69 @@ class WorkersRepository {
     });
   }
 
+  Future<Map<String, Object?>> getWorkerEarnings(String workerId) {
+    return _database.withReadConnection((connection) async {
+      final summaryResult = await connection.execute(
+        Sql.named('''
+          select
+            count(*)::int as jobs_count,
+            coalesce(sum(gross_amount), 0)::bigint as total_gross,
+            coalesce(sum(commission_amount), 0)::bigint as total_commission,
+            coalesce(sum(net_amount), 0)::bigint as total_net
+          from public.platform_commissions
+          where worker_id = @workerId::uuid
+        '''),
+        parameters: {'workerId': workerId},
+      );
+
+      final recentResult = await connection.execute(
+        Sql.named('''
+          select
+            pc.request_id,
+            pc.gross_amount,
+            pc.commission_rate::float8,
+            pc.commission_amount,
+            pc.net_amount,
+            pc.created_at,
+            s.name as service_name,
+            c.name as category_name
+          from public.platform_commissions pc
+          left join public.service_requests sr on sr.id = pc.request_id
+          left join public.services s on s.id = sr.service_id
+          left join public.categories c on c.id = pc.category_id
+          where pc.worker_id = @workerId::uuid
+          order by pc.created_at desc
+          limit 30
+        '''),
+        parameters: {'workerId': workerId},
+      );
+
+      final summary = summaryResult.first;
+      final recent = recentResult
+          .map(
+            (row) => {
+              'request_id': row[0]?.toString(),
+              'gross_amount': row[1],
+              'commission_rate': row[2],
+              'commission_amount': row[3],
+              'net_amount': row[4],
+              'created_at': _formatTimestamp(row[5]),
+              'service_name': row[6],
+              'category_name': row[7],
+            },
+          )
+          .toList(growable: false);
+
+      return {
+        'jobs_count': summary[0],
+        'total_gross': summary[1],
+        'total_commission': summary[2],
+        'total_net': summary[3],
+        'recent': recent,
+      };
+    });
+  }
+
   String? _formatTimestamp(Object? value) {
     if (value is DateTime) {
       return value.toUtc().toIso8601String();

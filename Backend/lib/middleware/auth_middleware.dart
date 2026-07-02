@@ -1,16 +1,22 @@
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
+import 'package:handy_backend/auth/jwks_key_provider.dart';
 import 'package:handy_backend/config/app_config.dart';
 import 'package:handy_backend/middleware/http_middleware.dart';
 import 'package:shelf/shelf.dart';
 
 const userIdContextKey = 'user_id';
 
-Middleware authMiddleware(AppConfig config) {
+const _hmacAlgorithms = {'HS256', 'HS384', 'HS512'};
+
+Middleware authMiddleware(AppConfig config, {JwksKeyProvider? jwksProvider}) {
+  final legacySecret = config.supabaseJwtSecret;
+  final provider = jwksProvider ??
+      (config.hasJwks ? JwksKeyProvider(config.supabaseJwksUrl!) : null);
+
   return (Handler innerHandler) {
     return (Request request) async {
-      final secret = config.supabaseJwtSecret;
-      if (secret == null || secret.isEmpty) {
-        return jsonError(500, 'JWT secret is not configured');
+      if (legacySecret == null && provider == null) {
+        return jsonError(500, 'JWT verification is not configured');
       }
 
       final authorization = request.headers['Authorization'];
@@ -23,8 +29,40 @@ Middleware authMiddleware(AppConfig config) {
         return jsonError(401, 'Authorization required');
       }
 
+      final JWT header;
       try {
-        final jwt = JWT.verify(token, SecretKey(secret));
+        header = JWT.decode(token);
+      } on JWTException {
+        return jsonError(401, 'Invalid token');
+      } catch (_) {
+        return jsonError(401, 'Invalid token');
+      }
+
+      final algorithm = header.header?['alg'] as String?;
+      final kid = header.header?['kid'] as String?;
+
+      JWTKey? key;
+      if (algorithm != null && _hmacAlgorithms.contains(algorithm)) {
+        if (legacySecret == null || legacySecret.isEmpty) {
+          return jsonError(401, 'Invalid token');
+        }
+        key = SecretKey(legacySecret);
+      } else {
+        if (provider == null) {
+          return jsonError(401, 'Invalid token');
+        }
+        try {
+          key = await provider.keyForKid(kid);
+        } catch (_) {
+          return jsonError(401, 'Invalid token');
+        }
+        if (key == null) {
+          return jsonError(401, 'Invalid token');
+        }
+      }
+
+      try {
+        final jwt = JWT.verify(token, key);
         final payload = jwt.payload;
         final userId = payload is Map ? payload['sub'] : null;
 

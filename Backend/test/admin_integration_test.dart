@@ -1,6 +1,6 @@
 import 'package:shelf/shelf.dart';
-import 'package:test/support/fake_admin_operations.dart';
-import 'package:test/support/test_http.dart';
+import 'support/fake_admin_operations.dart';
+import 'support/test_http.dart';
 import 'package:test/test.dart';
 
 void main() {

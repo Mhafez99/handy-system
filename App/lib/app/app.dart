@@ -13,6 +13,8 @@ class HandyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Handy',
       theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.system,
       builder: (context, child) {
         return Directionality(
           textDirection: TextDirection.rtl,

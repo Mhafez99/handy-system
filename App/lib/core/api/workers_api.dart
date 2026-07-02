@@ -1,5 +1,6 @@
 import 'package:handy_app/core/api/api_client.dart';
 import 'package:handy_app/features/reviews/domain/worker_rating_summary.dart';
+import 'package:handy_app/features/worker/domain/worker_earnings.dart';
 import 'package:handy_app/features/worker/domain/worker_public_details.dart';
 
 class WorkersApi {
@@ -27,5 +28,10 @@ class WorkersApi {
   Future<WorkerPublicDetails> loadWorkerPublicDetails(String workerId) async {
     final row = await _client.getObject('/v1/workers/$workerId');
     return WorkerPublicDetails.fromJson(row);
+  }
+
+  Future<WorkerEarnings> loadMyEarnings() async {
+    final row = await _client.getObject('/v1/workers/me/earnings');
+    return WorkerEarnings.fromJson(row);
   }
 }

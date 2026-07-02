@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:handy_app/core/widgets/app_ui.dart';
 import 'package:handy_app/features/auth/data/auth_repository.dart';
 import 'package:handy_app/features/auth/presentation/profile_page.dart';
 import 'package:handy_app/features/customer/presentation/customer_shell_page.dart';
@@ -44,16 +45,15 @@ class _AccountHomePageState extends State<AccountHomePage> {
             body: Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('تعذر تحميل بيانات الحساب.'),
-                    const SizedBox(height: 12),
-                    OutlinedButton(
-                      onPressed: reloadProfile,
-                      child: const Text('إعادة المحاولة'),
-                    ),
-                  ],
+                child: AppEmptyState(
+                  icon: Icons.error_outline_rounded,
+                  title: 'تعذر تحميل بيانات الحساب.',
+                  message: 'تأكد من اتصالك بالإنترنت وحاول مرة أخرى.',
+                  action: OutlinedButton.icon(
+                    onPressed: reloadProfile,
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('إعادة المحاولة'),
+                  ),
                 ),
               ),
             ),
@@ -143,23 +143,33 @@ class WorkerWaitingPage extends StatelessWidget {
             ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
-          const Text('حساب صنايعي', textAlign: TextAlign.center),
+          const Center(
+            child: AppBadge(
+              label: 'حساب صنايعي',
+              variant: AppBadgeVariant.primary,
+              icon: Icons.handyman_outlined,
+            ),
+          ),
           const SizedBox(height: 24),
-          Card(
-            color: Theme.of(context).colorScheme.secondaryContainer,
-            child: const Padding(
-              padding: EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Icon(Icons.hourglass_top_rounded),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'حسابك قيد المراجعة. ستتمكن من استقبال الطلبات بعد الاعتماد.',
-                    ),
+          AppCard(
+            child: Row(
+              children: [
+                Icon(
+                  Icons.hourglass_top_rounded,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'حسابك قيد المراجعة. ستتمكن من استقبال الطلبات بعد الاعتماد.',
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 8),
+                const AppBadge(
+                  label: 'قيد المراجعة',
+                  variant: AppBadgeVariant.warning,
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 24),

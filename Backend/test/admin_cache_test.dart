@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:handy_backend/cache/cache_store.dart';
 import 'package:handy_backend/repositories/admin_repository.dart';
-import 'package:test/support/throwing_database.dart';
+import 'support/throwing_database.dart';
 import 'package:test/test.dart';
 
 void main() {

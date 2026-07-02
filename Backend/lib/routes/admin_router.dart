@@ -211,9 +211,86 @@ Handler buildAdminRouter(AdminOperations repository) {
         isHidden: body['is_hidden'] == true,
       );
       return jsonOk({'ok': true});
+    })
+    ..get('/settings', (Request request) async {
+      final settings = await repository.getSettings();
+      return jsonOk(settings);
+    })
+    ..patch('/settings', (Request request) async {
+      final body = await readJsonBody(request);
+      final rate = _readDouble(body['default_commission_rate']);
+      if (rate == null) {
+        return jsonError(400, 'default_commission_rate is required');
+      }
+
+      await repository.updateSettings(
+        defaultCommissionRate: rate,
+        minOrderPrice: _readInt(body['min_order_price'], defaultValue: 0),
+      );
+      return jsonOk({'ok': true});
+    })
+    ..patch('/categories/<categoryId>/commission', (
+      Request request,
+      String categoryId,
+    ) async {
+      final parsedCategoryId = int.tryParse(categoryId);
+      if (parsedCategoryId == null) {
+        return jsonError(400, 'Invalid category id');
+      }
+
+      final body = await readJsonBody(request);
+      await repository.updateCategoryCommission(
+        categoryId: parsedCategoryId,
+        commissionRate: _readDouble(body['commission_rate']),
+      );
+      return jsonOk({'ok': true});
+    })
+    ..get('/revenue/stats', (Request request) async {
+      final dateRange = _readDateRange(request);
+      final stats = await repository.getRevenueStats(
+        from: dateRange.$1,
+        to: dateRange.$2,
+      );
+      return jsonOk(stats);
+    })
+    ..get('/revenue/by-category', (Request request) async {
+      final dateRange = _readDateRange(request);
+      final rows = await repository.getRevenueByCategory(
+        from: dateRange.$1,
+        to: dateRange.$2,
+      );
+      return jsonOk(rows);
+    })
+    ..get('/revenue/daily', (Request request) async {
+      final dateRange = _readDateRange(request);
+      final rows = await repository.getRevenueDaily(
+        from: dateRange.$1,
+        to: dateRange.$2,
+      );
+      return jsonOk(rows);
+    })
+    ..get('/payouts', (Request request) async {
+      final dateRange = _readDateRange(request);
+      final limit = int.tryParse(request.url.queryParameters['limit'] ?? '');
+      final rows = await repository.listWorkerPayouts(
+        from: dateRange.$1,
+        to: dateRange.$2,
+        limit: limit ?? 50,
+      );
+      return jsonOk(rows);
     });
 
   return router.call;
+}
+
+double? _readDouble(Object? value) {
+  if (value == null) {
+    return null;
+  }
+  if (value is num) {
+    return value.toDouble();
+  }
+  return double.tryParse(value.toString());
 }
 
 (DateTime?, DateTime?) _readDateRange(Request request) {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:handy_app/core/widgets/app_ui.dart';
 import 'package:handy_app/features/areas/domain/area.dart';
 import 'package:handy_app/features/areas/presentation/area_picker_fields.dart';
 import 'package:handy_app/features/auth/data/auth_repository.dart';
@@ -553,17 +554,18 @@ class ProfileStatusChip extends StatelessWidget {
       _ => status,
     };
 
-    final color = switch (status) {
-      'active' => Colors.green,
-      'pending' => Theme.of(context).colorScheme.primary,
-      'suspended' => Theme.of(context).colorScheme.error,
-      _ => Theme.of(context).colorScheme.outline,
+    final variant = switch (status) {
+      'active' => AppBadgeVariant.success,
+      'pending' => AppBadgeVariant.warning,
+      'suspended' => AppBadgeVariant.destructive,
+      _ => AppBadgeVariant.neutral,
     };
 
     return Center(
-      child: Chip(
-        avatar: Icon(Icons.circle, size: 10, color: color),
-        label: Text(label),
+      child: AppBadge(
+        label: label,
+        variant: variant,
+        icon: Icons.circle,
       ),
     );
   }

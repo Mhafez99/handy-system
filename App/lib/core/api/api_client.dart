@@ -102,6 +102,27 @@ class ApiClient {
     }
   }
 
+  Future<Map<String, dynamic>> patchObject(
+    String path, {
+    Map<String, dynamic>? body,
+  }) async {
+    final response = await _send('PATCH', path, body: body);
+
+    if (response.statusCode >= 400) {
+      throw ApiException(
+        _readErrorMessage(response.body) ?? 'تعذر الاتصال بالخادم.',
+        statusCode: response.statusCode,
+      );
+    }
+
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map) {
+      throw const ApiException('استجابة غير متوقعة من الخادم.');
+    }
+
+    return Map<String, dynamic>.from(decoded);
+  }
+
   Future<void> putVoid(
     String path, {
     Map<String, dynamic>? body,
@@ -178,6 +199,7 @@ class ApiClient {
     return switch (method) {
       'POST' => await _httpClient.post(uri, headers: headers, body: encodedBody),
       'PUT' => await _httpClient.put(uri, headers: headers, body: encodedBody),
+      'PATCH' => await _httpClient.patch(uri, headers: headers, body: encodedBody),
       'DELETE' => await _httpClient.delete(uri, headers: headers, body: encodedBody),
       _ => await _httpClient.get(uri, headers: headers),
     };

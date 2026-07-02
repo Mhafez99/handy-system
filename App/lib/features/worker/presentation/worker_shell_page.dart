@@ -5,6 +5,9 @@ import 'package:handy_app/features/auth/presentation/profile_page.dart';
 import 'package:handy_app/features/requests/data/service_requests_repository.dart';
 import 'package:handy_app/features/requests/domain/accepted_worker_request.dart';
 import 'package:handy_app/features/requests/domain/available_worker_request.dart';
+import 'package:handy_app/features/worker/data/workers_repository.dart';
+import 'package:handy_app/features/worker/domain/worker_earnings.dart';
+import 'package:handy_app/features/worker/presentation/worker_earnings_page.dart';
 import 'package:handy_app/features/worker/presentation/worker_history_page.dart';
 import 'package:handy_app/features/worker/presentation/worker_home_page.dart';
 
@@ -27,9 +30,11 @@ class WorkerShellPage extends StatefulWidget {
 class _WorkerShellPageState extends State<WorkerShellPage>
     with AutoRefreshOnResume<WorkerShellPage>, PeriodicRefresh<WorkerShellPage> {
   final repository = ServiceRequestsRepository();
+  final workersRepository = WorkersRepository();
   late Future<List<AvailableWorkerRequest>> availableRequestsFuture;
   late Future<List<AcceptedWorkerRequest>> activeRequestsFuture;
   late Future<List<AcceptedWorkerRequest>> completedRequestsFuture;
+  late Future<WorkerEarnings> earningsFuture;
   int _selectedIndex = 0;
 
   @override
@@ -56,6 +61,7 @@ class _WorkerShellPageState extends State<WorkerShellPage>
       availableRequestsFuture = repository.loadAvailableWorkerRequests();
       activeRequestsFuture = repository.loadActiveWorkerRequests();
       completedRequestsFuture = repository.loadCompletedWorkerRequests();
+      earningsFuture = workersRepository.loadMyEarnings();
     });
   }
 
@@ -71,11 +77,15 @@ class _WorkerShellPageState extends State<WorkerShellPage>
 
   @override
   Widget build(BuildContext context) {
-    final isWorkTab = _selectedIndex == 0;
+    final title = switch (_selectedIndex) {
+      0 => 'الشغل',
+      1 => 'سجل الأعمال',
+      _ => 'أرباحي',
+    };
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isWorkTab ? 'الشغل' : 'سجل الأعمال'),
+        title: Text(title),
         actions: [
           IconButton(
             tooltip: 'الملف الشخصي',
@@ -102,6 +112,10 @@ class _WorkerShellPageState extends State<WorkerShellPage>
             completedRequestsFuture: completedRequestsFuture,
             onReload: reloadRequests,
           ),
+          WorkerEarningsPage(
+            earningsFuture: earningsFuture,
+            onReload: reloadRequests,
+          ),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -120,6 +134,11 @@ class _WorkerShellPageState extends State<WorkerShellPage>
             icon: Icon(Icons.history_outlined),
             selectedIcon: Icon(Icons.history_rounded),
             label: 'السجل',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.account_balance_wallet_outlined),
+            selectedIcon: Icon(Icons.account_balance_wallet_rounded),
+            label: 'أرباحي',
           ),
         ],
       ),

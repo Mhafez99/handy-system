@@ -11,11 +11,13 @@ import 'package:handy_backend/rate_limit/rate_limit_store.dart';
 import 'package:handy_backend/repositories/admin_repository.dart';
 import 'package:handy_backend/repositories/catalog_repository.dart';
 import 'package:handy_backend/repositories/device_tokens_repository.dart';
+import 'package:handy_backend/repositories/profiles_repository.dart';
 import 'package:handy_backend/repositories/requests_repository.dart';
 import 'package:handy_backend/repositories/workers_repository.dart';
 import 'package:handy_backend/routes/admin_router.dart';
 import 'package:handy_backend/routes/devices_router.dart';
 import 'package:handy_backend/routes/handlers.dart';
+import 'package:handy_backend/routes/profile_router.dart';
 import 'package:handy_backend/routes/requests_router.dart';
 import 'package:handy_backend/routes/workers_router.dart';
 import 'package:handy_backend/storage/supabase_storage_client.dart';
@@ -94,6 +96,7 @@ Future<HandyApplication> buildHandyApplication(AppConfig config) async {
     ),
   );
   final workersRepository = WorkersRepository(database);
+  final profilesRepository = ProfilesRepository(database);
   final adminRepository = AdminRepository(
     database,
     cache: cacheStore,
@@ -108,6 +111,10 @@ Future<HandyApplication> buildHandyApplication(AppConfig config) async {
   final authenticatedWorkersHandler = Pipeline()
       .addMiddleware(authMiddleware(config))
       .addHandler(buildWorkersRouter(workersRepository));
+
+  final authenticatedProfileHandler = Pipeline()
+      .addMiddleware(authMiddleware(config))
+      .addHandler(buildProfileRouter(profilesRepository));
 
   final authenticatedDevicesHandler = Pipeline()
       .addMiddleware(authMiddleware(config))
@@ -124,6 +131,7 @@ Future<HandyApplication> buildHandyApplication(AppConfig config) async {
     ..mount('/v1/catalog', buildCatalogRouter(catalogRepository))
     ..mount('/v1/requests', authenticatedRequestsHandler)
     ..mount('/v1/workers', authenticatedWorkersHandler)
+    ..mount('/v1/profile', authenticatedProfileHandler)
     ..mount('/v1/devices', authenticatedDevicesHandler)
     ..mount('/v1/admin', authenticatedAdminHandler);
 

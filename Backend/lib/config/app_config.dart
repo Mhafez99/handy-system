@@ -11,6 +11,7 @@ class AppConfig {
     this.prewarmDatabasePools = true,
     this.supabaseUrl,
     this.supabaseJwtSecret,
+    this.supabaseJwksUrl,
     this.supabaseServiceRoleKey,
     this.redisUrl,
     this.fcmServerKey,
@@ -57,6 +58,7 @@ class AppConfig {
       prewarmDatabasePools: prewarmDatabasePools,
       supabaseUrl: env['SUPABASE_URL']?.trim(),
       supabaseJwtSecret: env['SUPABASE_JWT_SECRET']?.trim(),
+      supabaseJwksUrl: _resolveJwksUrl(env),
       supabaseServiceRoleKey: env['SUPABASE_SERVICE_ROLE_KEY']?.trim(),
       redisUrl: env['REDIS_URL']?.trim(),
       fcmServerKey: env['FCM_SERVER_KEY']?.trim(),
@@ -78,6 +80,7 @@ class AppConfig {
   final bool prewarmDatabasePools;
   final String? supabaseUrl;
   final String? supabaseJwtSecret;
+  final String? supabaseJwksUrl;
   final String? supabaseServiceRoleKey;
   final String? redisUrl;
   final String? fcmServerKey;
@@ -87,6 +90,12 @@ class AppConfig {
 
   bool get hasReadReplica =>
       readDatabaseUrl != null && readDatabaseUrl != databaseUrl;
+
+  bool get hasJwtSecret => supabaseJwtSecret?.isNotEmpty ?? false;
+
+  bool get hasJwks => supabaseJwksUrl?.isNotEmpty ?? false;
+
+  bool get hasAuth => hasJwtSecret || hasJwks;
 
   bool get hasStorageSigning =>
       (supabaseUrl?.isNotEmpty ?? false) &&
@@ -100,6 +109,23 @@ class AppConfig {
 
   Duration get databaseAcquireTimeout =>
       Duration(seconds: databaseAcquireTimeoutSeconds);
+
+  static String? _resolveJwksUrl(Map<String, String> env) {
+    final explicit = env['SUPABASE_JWKS_URL']?.trim();
+    if (explicit != null && explicit.isNotEmpty) {
+      return explicit;
+    }
+
+    final supabaseUrl = env['SUPABASE_URL']?.trim();
+    if (supabaseUrl == null || supabaseUrl.isEmpty) {
+      return null;
+    }
+
+    final normalized = supabaseUrl.endsWith('/')
+        ? supabaseUrl.substring(0, supabaseUrl.length - 1)
+        : supabaseUrl;
+    return '$normalized/auth/v1/.well-known/jwks.json';
+  }
 
   static bool _parseBool(String? rawValue, {required bool defaultValue}) {
     if (rawValue == null || rawValue.trim().isEmpty) {

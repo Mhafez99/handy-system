@@ -102,4 +102,37 @@ abstract class AdminOperations {
     required String reviewId,
     required bool isHidden,
   });
+
+  Future<Map<String, Object?>> getSettings();
+
+  Future<void> updateSettings({
+    required double defaultCommissionRate,
+    required int minOrderPrice,
+  });
+
+  Future<void> updateCategoryCommission({
+    required int categoryId,
+    double? commissionRate,
+  });
+
+  Future<Map<String, Object?>> getRevenueStats({
+    DateTime? from,
+    DateTime? to,
+  });
+
+  Future<List<Map<String, Object?>>> getRevenueByCategory({
+    DateTime? from,
+    DateTime? to,
+  });
+
+  Future<List<Map<String, Object?>>> getRevenueDaily({
+    DateTime? from,
+    DateTime? to,
+  });
+
+  Future<List<Map<String, Object?>>> listWorkerPayouts({
+    DateTime? from,
+    DateTime? to,
+    int limit = 50,
+  });
 }

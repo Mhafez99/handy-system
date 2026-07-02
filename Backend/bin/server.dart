@@ -28,14 +28,22 @@ Future<void> main(List<String> args) async {
     stdout.writeln('Rate limiting enabled');
   }
 
-  ProcessSignal.sigint.watch().listen((_) async {
-    await app.close();
-    exit(0);
-  });
-  ProcessSignal.sigterm.watch().listen((_) async {
-    await app.close();
-    exit(0);
-  });
+  _watchShutdownSignal(ProcessSignal.sigint, app);
+  // SIGTERM is not supported on Windows; guard so startup doesn't crash.
+  if (!Platform.isWindows) {
+    _watchShutdownSignal(ProcessSignal.sigterm, app);
+  }
+}
+
+void _watchShutdownSignal(ProcessSignal signal, HandyApplication app) {
+  try {
+    signal.watch().listen((_) async {
+      await app.close();
+      exit(0);
+    });
+  } on SignalException {
+    // Signal not supported on this platform; ignore.
+  }
 }
 
 Map<String, String> _loadEnvironment() {
@@ -58,11 +66,20 @@ Map<String, String> _loadEnvironment() {
     }
 
     final key = trimmed.substring(0, separatorIndex).trim();
-    final value = trimmed.substring(separatorIndex + 1).trim();
+    final value = _unquote(trimmed.substring(separatorIndex + 1).trim());
     if (key.isNotEmpty) {
       environment[key] = value;
     }
   }
 
   return environment;
+}
+
+String _unquote(String value) {
+  if (value.length >= 2 &&
+      ((value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'")))) {
+    return value.substring(1, value.length - 1);
+  }
+  return value;
 }

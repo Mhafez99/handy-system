@@ -6,6 +6,15 @@ import 'package:shelf_router/shelf_router.dart';
 
 Handler buildWorkersRouter(WorkersRepository repository) {
   final router = Router()
+    ..get('/me/earnings', (Request request) async {
+      final userId = readUserId(request);
+      if (userId == null) {
+        return jsonError(401, 'Authorization required');
+      }
+
+      final earnings = await repository.getWorkerEarnings(userId);
+      return jsonOk(earnings);
+    })
     ..post('/ratings/summary', (Request request) async {
       final userId = readUserId(request);
       if (userId == null) {

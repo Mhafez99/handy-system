@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:handy_app/core/realtime/service_requests_realtime.dart';
+import 'package:handy_app/core/widgets/app_ui.dart';
 import 'package:handy_app/features/complaints/data/complaints_repository.dart';
 import 'package:handy_app/features/complaints/domain/create_complaint_data.dart';
 import 'package:handy_app/features/complaints/domain/service_complaint.dart';
@@ -238,11 +239,14 @@ class _RequestDetailsPageState extends State<RequestDetailsPage> {
                 return ListView(
                   padding: const EdgeInsets.all(24),
                   children: [
-                    const Text('تعذر تحميل تفاصيل الطلب.'),
-                    const SizedBox(height: 12),
-                    OutlinedButton(
-                      onPressed: reloadDetails,
-                      child: const Text('إعادة المحاولة'),
+                    AppEmptyState(
+                      icon: Icons.receipt_long_outlined,
+                      title: 'تعذر تحميل تفاصيل الطلب.',
+                      action: OutlinedButton.icon(
+                        onPressed: reloadDetails,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('إعادة المحاولة'),
+                      ),
                     ),
                   ],
                 );
@@ -882,9 +886,9 @@ class OfferCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                Chip(
-                  label: Text('${offer.price} جنيه'),
-                  visualDensity: VisualDensity.compact,
+                AppBadge(
+                  label: '${offer.price} جنيه',
+                  variant: AppBadgeVariant.primary,
                 ),
               ],
             ),
@@ -1020,29 +1024,10 @@ class EmptyOffersCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Icon(
-              Icons.local_offer_outlined,
-              size: 48,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            const SizedBox(height: 12),
-            const Text('لم تصلك عروض بعد.', textAlign: TextAlign.center),
-            const SizedBox(height: 4),
-            Text(
-              'عندما يرسل الصنايعية عروضهم ستظهر هنا.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return const AppEmptyState(
+      icon: Icons.local_offer_outlined,
+      title: 'لم تصلك عروض بعد.',
+      message: 'عندما يرسل الصنايعية عروضهم ستظهر هنا.',
     );
   }
 }

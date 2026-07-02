@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:handy_app/core/widgets/app_ui.dart';
 import 'package:handy_app/features/customer/domain/customer_request_filter.dart';
 import 'package:handy_app/features/requests/domain/customer_request.dart';
 
@@ -90,9 +91,17 @@ class CustomerRequestStatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Chip(
-      label: Text(customerRequestStatusLabel(status)),
-      visualDensity: VisualDensity.compact,
+    final variant = switch (status) {
+      'completed' => AppBadgeVariant.success,
+      'cancelled' || 'rejected' => AppBadgeVariant.destructive,
+      'pending' || 'open' => AppBadgeVariant.warning,
+      'complaint' => AppBadgeVariant.destructive,
+      _ => AppBadgeVariant.primary,
+    };
+
+    return AppBadge(
+      label: customerRequestStatusLabel(status),
+      variant: variant,
     );
   }
 }
@@ -120,34 +129,12 @@ class CustomerRequestsEmptyCard extends StatelessWidget {
         'لا توجد شكاوى مسجّلة.',
     };
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Icon(
-              Icons.assignment_outlined,
-              size: 48,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              filter == CustomerRequestFilter.all
-                  ? 'لسه مفيش طلبات.'
-                  : 'مفيش طلبات في "${filter.label}".',
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return AppEmptyState(
+      icon: Icons.assignment_outlined,
+      title: filter == CustomerRequestFilter.all
+          ? 'لسه مفيش طلبات.'
+          : 'مفيش طلبات في "${filter.label}".',
+      message: message,
     );
   }
 }
@@ -164,19 +151,13 @@ class CustomerRequestsErrorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Text(message),
-            const SizedBox(height: 8),
-            OutlinedButton(
-              onPressed: onRetry,
-              child: const Text('إعادة المحاولة'),
-            ),
-          ],
-        ),
+    return AppEmptyState(
+      icon: Icons.wifi_off_rounded,
+      title: message,
+      action: OutlinedButton.icon(
+        onPressed: onRetry,
+        icon: const Icon(Icons.refresh_rounded),
+        label: const Text('إعادة المحاولة'),
       ),
     );
   }

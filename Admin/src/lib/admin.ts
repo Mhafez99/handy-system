@@ -410,7 +410,7 @@ export async function loadReviews(filters: ReviewFilters = {}) {
         worker_id: filters.workerId,
         min_rating: filters.minRating,
         max_rating: filters.maxRating,
-        include_hidden: filters.includeHidden ?? true,
+        include_hidden: String(filters.includeHidden ?? true),
         limit: filters.limit ?? 50,
       })}`,
     );
@@ -777,4 +777,235 @@ export async function updateService(input: UpdateServiceInput) {
   if (error) {
     throw new Error(error.message);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Platform settings, commission and revenue
+// ---------------------------------------------------------------------------
+
+export type CategoryCommission = {
+  id: number;
+  name: string;
+  commission_rate: number | null;
+};
+
+export type AdminSettings = {
+  default_commission_rate: number;
+  min_order_price: number;
+  updated_at: string | null;
+  categories: CategoryCommission[];
+};
+
+export type RevenueStats = {
+  completed_count: number;
+  total_gross: number;
+  total_commission: number;
+  total_net: number;
+  avg_order: number;
+  is_filtered: boolean;
+};
+
+export type RevenueByCategory = {
+  category_id: number | null;
+  category_name: string;
+  completed_count: number;
+  total_gross: number;
+  total_commission: number;
+  total_net: number;
+};
+
+export type RevenueDailyPoint = {
+  day: string;
+  total_gross: number;
+  total_commission: number;
+  total_net: number;
+};
+
+export type WorkerPayout = {
+  worker_id: string;
+  worker_name: string;
+  worker_phone: string;
+  jobs_count: number;
+  total_gross: number;
+  total_commission: number;
+  total_net: number;
+};
+
+export async function loadSettings() {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    return handyApiRequest<AdminSettings>(token, "GET", "/v1/admin/settings");
+  }
+
+  const { data, error } = await supabase.rpc("admin_get_settings");
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? {
+    default_commission_rate: 0.1,
+    min_order_price: 0,
+    updated_at: null,
+    categories: [],
+  }) as AdminSettings;
+}
+
+export async function updateSettings(input: {
+  defaultCommissionRate: number;
+  minOrderPrice: number;
+}) {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    await handyApiRequest(token, "PATCH", "/v1/admin/settings", {
+      default_commission_rate: input.defaultCommissionRate,
+      min_order_price: input.minOrderPrice,
+    });
+    return;
+  }
+
+  const { error } = await supabase.rpc("admin_update_settings", {
+    p_default_commission_rate: input.defaultCommissionRate,
+    p_min_order_price: input.minOrderPrice,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function updateCategoryCommission(
+  categoryId: number,
+  commissionRate: number | null,
+) {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    await handyApiRequest(
+      token,
+      "PATCH",
+      `/v1/admin/categories/${categoryId}/commission`,
+      { commission_rate: commissionRate },
+    );
+    return;
+  }
+
+  const { error } = await supabase.rpc("admin_update_category_commission", {
+    p_category_id: categoryId,
+    p_commission_rate: commissionRate,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function loadRevenueStats(dateRange: OverviewDateRange) {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    return handyApiRequest<RevenueStats>(
+      token,
+      "GET",
+      `/v1/admin/revenue/stats${buildQuery({
+        from: dateRange.from,
+        to: dateRange.to,
+      })}`,
+    );
+  }
+
+  const { data, error } = await supabase.rpc("admin_revenue_stats", {
+    p_from: dateRange.from,
+    p_to: dateRange.to,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? {
+    completed_count: 0,
+    total_gross: 0,
+    total_commission: 0,
+    total_net: 0,
+    avg_order: 0,
+    is_filtered: false,
+  }) as RevenueStats;
+}
+
+export async function loadRevenueByCategory(dateRange: OverviewDateRange) {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    return handyApiRequest<RevenueByCategory[]>(
+      token,
+      "GET",
+      `/v1/admin/revenue/by-category${buildQuery({
+        from: dateRange.from,
+        to: dateRange.to,
+      })}`,
+    );
+  }
+
+  const { data, error } = await supabase.rpc("admin_revenue_by_category", {
+    p_from: dateRange.from,
+    p_to: dateRange.to,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []) as RevenueByCategory[];
+}
+
+export async function loadRevenueDaily(dateRange: OverviewDateRange) {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    return handyApiRequest<RevenueDailyPoint[]>(
+      token,
+      "GET",
+      `/v1/admin/revenue/daily${buildQuery({
+        from: dateRange.from,
+        to: dateRange.to,
+      })}`,
+    );
+  }
+
+  const { data, error } = await supabase.rpc("admin_revenue_daily", {
+    p_from: dateRange.from,
+    p_to: dateRange.to,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []) as RevenueDailyPoint[];
+}
+
+export async function loadWorkerPayouts(
+  dateRange: OverviewDateRange,
+  limit = 50,
+) {
+  if (isHandyApiConfigured) {
+    const token = await getAccessToken();
+    return handyApiRequest<WorkerPayout[]>(
+      token,
+      "GET",
+      `/v1/admin/payouts${buildQuery({
+        from: dateRange.from,
+        to: dateRange.to,
+        limit,
+      })}`,
+    );
+  }
+
+  const { data, error } = await supabase.rpc("admin_list_worker_payouts", {
+    p_from: dateRange.from,
+    p_to: dateRange.to,
+    p_limit: limit,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []) as WorkerPayout[];
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:handy_app/core/widgets/app_ui.dart';
 import 'package:handy_app/features/customer/domain/customer_request_filter.dart';
 import 'package:handy_app/features/customer/presentation/customer_request_widgets.dart';
 import 'package:handy_app/features/requests/domain/customer_request.dart';
@@ -30,38 +31,17 @@ class CustomerHomePage extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          Text(
-            'أهلًا ${profile['full_name'] ?? ''}',
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'اطلب صنايعي موثوق في منطقتك بدون دفع إلكتروني.',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed: onOpenCreateRequest,
-            icon: const Icon(Icons.home_repair_service_outlined),
-            label: const Text('إنشاء طلب جديد'),
+          _HomeHero(
+            name: profile['full_name'] as String? ?? '',
+            onCreate: onOpenCreateRequest,
           ),
           const SizedBox(height: 28),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'آخر الطلبات',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-                ),
-              ),
-              TextButton(onPressed: onOpenAllRequests, child: const Text('كل الطلبات')),
-            ],
+          AppSectionHeader(
+            title: 'آخر الطلبات',
+            trailing: TextButton(
+              onPressed: onOpenAllRequests,
+              child: const Text('كل الطلبات'),
+            ),
           ),
           const SizedBox(height: 12),
           FutureBuilder<List<CustomerRequest>>(
@@ -109,6 +89,67 @@ class CustomerHomePage extends StatelessWidget {
                 ],
               );
             },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeHero extends StatelessWidget {
+  const _HomeHero({required this.name, required this.onCreate});
+
+  final String name;
+  final VoidCallback onCreate;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return AppCard(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: cs.primary.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.waving_hand_rounded, color: cs.primary),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'أهلًا $name',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'اطلب صنايعي موثوق في منطقتك بدون دفع إلكتروني.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          FilledButton.icon(
+            onPressed: onCreate,
+            icon: const Icon(Icons.home_repair_service_outlined),
+            label: const Text('إنشاء طلب جديد'),
           ),
         ],
       ),
